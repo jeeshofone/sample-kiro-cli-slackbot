@@ -178,7 +178,7 @@ Kiro Cowork instantiates a custom agent named `kiro-coworker`. Its configuration
 
 ### Video Creation Example
 
-<iframe width="1062" height="597" src="https://www.youtube.com/embed/s46r3NS1V38" title="kiro announcement" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Kiro announcement](https://img.youtube.com/vi/s46r3NS1V38/0.jpg)](https://www.youtube.com/watch?v=s46r3NS1V38)
 
 ### Excel Modelling Example
 
