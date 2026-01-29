@@ -203,6 +203,10 @@ It has many skills for PPTs, Excel, Videos etc. Here is a simple promotional vid
 
 [![Kiro announcement](https://img.youtube.com/vi/s46r3NS1V38/0.jpg)](https://www.youtube.com/watch?v=s46r3NS1V38)
 
+  <a href="https://www.youtube.com/watch?v=s46r3NS1V38">
+    <img src="https://img.youtube.com/vi/s46r3NS1V38/0.jpg" alt="Kiro announcement" width="100%">
+  </a>
+
 ### Excel Modelling Example
 
 Antrhopic announced Claude for Excel. We tried capability of Kiro Cowork to do research and build excel models, it exceeded our expectations.
