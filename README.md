@@ -102,6 +102,8 @@ The macOS bundle is emitted to `dist/mac-arm64/Kiro Coworker.app`. Copy it into 
 ## Custom Agent Configuration & MCPs
 
 Kiro Cowork instantiates a custom agent named `kiro-coworker`. Its configuration lives in `~/.kiro/agents/agent_config.json`:
+You may use these configurations as they are, just remember to place your keys for Composio (that provides search over 500 MCP tools) and ZAI MCP in respective
+Replace_with_your_key field.
 
 ```json
 {
@@ -126,7 +128,7 @@ Kiro Cowork instantiates a custom agent named `kiro-coworker`. Its configuration
       "type": "http",
       "url": "https://backend.composio.dev/tool_router/trs_8YCbLt0jkO8_/mcp",
       "headers": {
-        "x-api-key": "ak_Ra86dArRGY_2yiYPsia7"
+        "x-api-key": "Replace_with_your_key"
       },
       "disabled": false
     },
@@ -135,7 +137,7 @@ Kiro Cowork instantiates a custom agent named `kiro-coworker`. Its configuration
       "command": "npx",
       "args": ["-y", "@z_ai/mcp-server"],
       "env": {
-        "Z_AI_API_KEY": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd",
+        "Z_AI_API_KEY": "Replace_with_your_key",
         "Z_AI_MODE": "ZAI"
       },
       "disabled": false
@@ -201,8 +203,6 @@ Kiro Cowork instantiates a custom agent named `kiro-coworker`. Its configuration
 
 It has many skills for PPTs, Excel, Videos etc. Here is a simple promotional video it made using Remotion-Best-Practices skill.
 
-[![Kiro announcement](https://img.youtube.com/vi/s46r3NS1V38/0.jpg)](https://www.youtube.com/watch?v=s46r3NS1V38)
-
   <a href="https://www.youtube.com/watch?v=s46r3NS1V38">
     <img src="https://img.youtube.com/vi/s46r3NS1V38/0.jpg" alt="Kiro announcement" width="100%">
   </a>
@@ -228,4 +228,10 @@ It didn't just build great tables, it also built great meaningful visualizations
 2. Run `bun run dev` for iterative changes.
 3. Update docs (`docs/ARCHITECTURE.md`, `docs/INTEGRATION.md`, this `README.md`) when touching architecture or UX.
 4. Open a merge request with a clear summary and testing notes.
+
+## Roadmap
+
+1. Add voice interface
+2. Fix the issue with MCP Servers that need Web Socket connections (e.g. Pencil Desktop MCP)
+
 
