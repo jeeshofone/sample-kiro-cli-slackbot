@@ -3,11 +3,8 @@ import path from "path"
 import { app } from "electron"
 
 export function getPreloadPath() {
-    return path.join(
-        app.getAppPath(),
-        isDev() ? './' : '../',
-        '/dist-electron/preload.cjs'
-    )
+    const base = path.resolve(app.getAppPath(), isDev() ? "." : "..");
+    return path.join(base, "dist-electron", "electron", "preload.cjs");
 }
 
 export function getUIPath() {
@@ -15,9 +12,6 @@ export function getUIPath() {
 }
 
 export function getIconPath() {
-    return path.join(
-        app.getAppPath(),
-        isDev() ? './' : '../',
-        '/templateIcon.png'
-    )
+    const base = path.resolve(app.getAppPath(), isDev() ? "." : "..");
+    return path.join(base, "templateIcon.png");
 }

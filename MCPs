@@ -1,0 +1,26 @@
+,
+        "zai-mcp-server": {
+          "type": "stdio",
+          "command": "npx",
+          "args": [
+            "-y",
+            "@z_ai/mcp-server"
+          ],
+          "env": {
+            "Z_AI_API_KEY": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd",
+            "Z_AI_MODE": "ZAI"
+          }
+        }
+
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@z_ai/mcp-server"
+      ],
+      "env": {
+        "Z_AI_API_KEY": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd",
+        "Z_AI_MODE": "ZAI"
+      }
+    }

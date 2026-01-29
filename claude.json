@@ -1,0 +1,282 @@
+{
+    "numStartups": 14,
+    "installMethod": "native",
+    "autoUpdates": false,
+    "tipsHistory": {
+      "new-user-warmup": 8,
+      "plan-mode-for-complex-tasks": 11,
+      "memory-command": 2,
+      "theme-command": 2,
+      "colorterm-truecolor": 2,
+      "status-line": 2,
+      "stickers-command": 2,
+      "prompt-queue": 12,
+      "enter-to-steer-in-relatime": 3,
+      "todo-list": 3,
+      "ide-upsell-external-terminal": 12,
+      "install-github-app": 13,
+      "shift-enter": 14,
+      "install-slack-app": 14,
+      "drag-and-drop-images": 14,
+      "paste-images-mac": 14,
+      "double-esc-code-restore": 5,
+      "continue": 5,
+      "shift-tab": 5,
+      "image-paste": 5,
+      "desktop-app": 5,
+      "web-app": 5,
+      "mobile-app": 5,
+      "custom-agents": 6,
+      "permissions": 11,
+      "rename-conversation": 11,
+      "custom-commands": 11
+    },
+    "cachedStatsigGates": {
+      "tengu_prompt_suggestion": false
+    },
+    "cachedGrowthBookFeatures": {
+      "tengu_1p_event_batch_config": {
+        "scheduledDelayMillis": 5000,
+        "maxExportBatchSize": 200,
+        "maxQueueSize": 8192
+      },
+      "tengu_mcp_tool_search": false,
+      "tengu_scratch": false,
+      "tengu_disable_bypass_permissions_mode": false,
+      "tengu_log_segment_events": false,
+      "tengu_log_datadog_events": true,
+      "tengu_event_sampling_config": {},
+      "tengu_tool_pear": false,
+      "tengu_c4w_usage_limit_notifications_enabled": true,
+      "tengu_thinkback": false,
+      "tengu_pid_based_version_locking": true,
+      "tengu_streaming_tool_execution2": false,
+      "tengu_tool_search_unsupported_models": null,
+      "tengu_ant_attribution_header_new": true,
+      "tengu_sumi": true,
+      "tengu-top-of-feed-tip": {
+        "tip": "",
+        "color": ""
+      },
+      "tengu_react_vulnerability_warning": false,
+      "tengu_code_diff_cli": true,
+      "tengu_post_compact_survey": false,
+      "enhanced_telemetry_beta": false,
+      "tengu_chrome_auto_enable": false,
+      "tengu_session_memory": false,
+      "tengu_permission_explainer": false,
+      "tengu_bash_haiku_prefetch": true
+    },
+    "userID": "d2b46984097e16a072f730066ed63874deb5b7081c7d4cd86d8ac24269d4c560",
+    "autoUpdatesProtectedForNative": true,
+    "firstStartTime": "2026-01-16T14:26:34.092Z",
+    "sonnet45MigrationComplete": true,
+    "opus45MigrationComplete": true,
+    "thinkingMigrationComplete": true,
+    "s1mAccessCache": {
+      "d600e611-13a1-4df2-bee8-1c93ac32226f": {
+        "hasAccess": false,
+        "hasAccessNotAsDefault": false,
+        "timestamp": 1768619364246
+      }
+    },
+    "passesEligibilityCache": {
+      "d600e611-13a1-4df2-bee8-1c93ac32226f": {
+        "eligible": true,
+        "referral_code_details": {
+          "code": "SJEw2sHuFw",
+          "campaign": "claude_code_guest_pass",
+          "referral_link": "https://claude.ai/referral/SJEw2sHuFw"
+        },
+        "timestamp": 1768626107602
+      }
+    },
+    "groveConfigCache": {
+      "a0f24963-1340-49d2-b4c7-5e703dc964f5": {
+        "grove_enabled": true,
+        "timestamp": 1768573598624
+      }
+    },
+    "opusProMigrationComplete": true,
+    "cachedChromeExtensionInstalled": true,
+    "changelogLastFetched": 1768628360676,
+    "claudeCodeFirstTokenDate": "2025-03-10T14:43:34.971641Z",
+    "appleTerminalSetupInProgress": false,
+    "appleTerminalBackupPath": "/Users/girpatil/Library/Preferences/com.apple.Terminal.plist.bak",
+    "optionAsMetaKeyInstalled": true,
+    "hasCompletedOnboarding": true,
+    "lastOnboardingVersion": "2.1.9",
+    "projects": {
+      "/Users/girpatil/Documents/Coding/ClaudeCode": {
+        "allowedTools": [],
+        "mcpContextUris": [],
+        "mcpServers": {},
+        "enabledMcpjsonServers": [],
+        "disabledMcpjsonServers": [],
+        "hasTrustDialogAccepted": true,
+        "projectOnboardingSeenCount": 2,
+        "hasClaudeMdExternalIncludesApproved": false,
+        "hasClaudeMdExternalIncludesWarningShown": false,
+        "reactVulnerabilityCache": {
+          "detected": false,
+          "package": null,
+          "packageName": null,
+          "version": null,
+          "packageManager": null
+        },
+        "lastCost": 0,
+        "lastAPIDuration": 0,
+        "lastAPIDurationWithoutRetries": 0,
+        "lastToolDuration": 0,
+        "lastDuration": 8828,
+        "lastLinesAdded": 0,
+        "lastLinesRemoved": 0,
+        "lastTotalInputTokens": 0,
+        "lastTotalOutputTokens": 0,
+        "lastTotalCacheCreationInputTokens": 0,
+        "lastTotalCacheReadInputTokens": 0,
+        "lastTotalWebSearchRequests": 0,
+        "lastModelUsage": {},
+        "lastSessionId": "68d69830-2802-43ce-88db-6c1cb01e492d"
+      },
+      "/Users/girpatil/Documents/Coding/Papers_To_Analyze": {
+        "allowedTools": [],
+        "mcpContextUris": [],
+        "mcpServers": {
+          "playwright": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+              "@playwright/mcp@latest"
+            ],
+            "env": {},
+            "disabled": false
+          },
+          "zai-mcp-server": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@z_ai/mcp-server"
+            ],
+            "env": {
+              "Z_AI_API_KEY": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd",
+              "Z_AI_MODE": "ZAI"
+            }
+          },
+          "web-search-prime": {
+              "type": "http",
+              "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+              "headers": {
+                "Authorization": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd"
+              }
+            },
+          "web-reader": {
+              "type": "http",
+              "url": "https://api.z.ai/api/mcp/web_reader/mcp",
+              "headers": {
+                "Authorization": "686a80f3d1e34141b9d1f6239b0b137e.iYhXKIWFWPXwjcpd"
+              }
+            }
+        },
+        "enabledMcpjsonServers": [],
+        "disabledMcpjsonServers": [],
+        "hasTrustDialogAccepted": true,
+        "projectOnboardingSeenCount": 5,
+        "hasClaudeMdExternalIncludesApproved": false,
+        "hasClaudeMdExternalIncludesWarningShown": false,
+        "reactVulnerabilityCache": {
+          "detected": false,
+          "package": null,
+          "packageName": null,
+          "version": null,
+          "packageManager": null
+        },
+        "lastCost": 0.24963269999999999,
+        "lastAPIDuration": 88848,
+        "lastAPIDurationWithoutRetries": 88841,
+        "lastToolDuration": 173,
+        "lastDuration": 662998,
+        "lastLinesAdded": 0,
+        "lastLinesRemoved": 0,
+        "lastTotalInputTokens": 8019,
+        "lastTotalOutputTokens": 2511,
+        "lastTotalCacheCreationInputTokens": 0,
+        "lastTotalCacheReadInputTokens": 301499,
+        "lastTotalWebSearchRequests": 0,
+        "lastModelUsage": {
+          "claude-haiku-4-5-20251001": {
+            "inputTokens": 94,
+            "outputTokens": 164,
+            "cacheReadInputTokens": 827,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.0009966999999999999
+          },
+          "claude-opus-4-5-20251101": {
+            "inputTokens": 7925,
+            "outputTokens": 2347,
+            "cacheReadInputTokens": 300672,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.24863600000000002
+          }
+        },
+        "lastSessionId": "46fed050-1a2d-4150-bf6a-bac9a81f74b6"
+      },
+      "/Users/girpatil": {
+        "mcpServers": {},
+        "lastCost": 0.48541625,
+        "lastAPIDuration": 106263,
+        "lastAPIDurationWithoutRetries": 106257,
+        "lastToolDuration": 16225,
+        "lastDuration": 145634582,
+        "lastLinesAdded": 68,
+        "lastLinesRemoved": 0,
+        "lastTotalInputTokens": 69236,
+        "lastTotalOutputTokens": 4637,
+        "lastTotalCacheCreationInputTokens": 25105,
+        "lastTotalCacheReadInputTokens": 325994,
+        "lastTotalWebSearchRequests": 0,
+        "lastModelUsage": {
+          "claude-haiku-4-5-20251001": {
+            "inputTokens": 69123,
+            "outputTokens": 1005,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0,
+            "costUSD": 0.07414799999999999
+          },
+          "claude-opus-4-5-20251101": {
+            "inputTokens": 113,
+            "outputTokens": 3632,
+            "cacheReadInputTokens": 325994,
+            "cacheCreationInputTokens": 25105,
+            "webSearchRequests": 0,
+            "costUSD": 0.41126825
+          }
+        },
+        "lastSessionId": "7bcc42c1-0ede-4ad1-9eb9-5f4834a9fdff"
+      }
+    },
+    "lastReleaseNotesSeen": "2.1.11",
+    "hasShownOpus45Notice": {
+      "d600e611-13a1-4df2-bee8-1c93ac32226f": true
+    },
+    "officialMarketplaceAutoInstallAttempted": true,
+    "officialMarketplaceAutoInstalled": true,
+    "mcpServers": {},
+    "oauthAccount": {
+      "accountUuid": "a0f24963-1340-49d2-b4c7-5e703dc964f5",
+      "emailAddress": "girishp1983@gmail.com",
+      "organizationUuid": "d600e611-13a1-4df2-bee8-1c93ac32226f",
+      "hasExtraUsageEnabled": true,
+      "displayName": "Girish",
+      "organizationRole": "admin",
+      "workspaceRole": null,
+      "organizationName": "Girish Patil"
+    },
+    "feedbackSurveyState": {
+      "lastShownTime": 1768628745506
+    }
+  }

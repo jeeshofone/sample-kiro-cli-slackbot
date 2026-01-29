@@ -2,6 +2,7 @@ import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/cla
 import type { ServerEvent } from "../types.js";
 import type { Session } from "./session-store.js";
 import { claudeCodePath, enhancedEnv} from "./util.js";
+import { loadMcpServers } from "./mcp-config.js";
 
 
 export type RunnerOptions = {
@@ -18,10 +19,42 @@ export type RunnerHandle = {
 
 const DEFAULT_CWD = process.cwd();
 
+async function loadMcpConfig(projectPath?: string) {
+  try {
+    const map = await loadMcpServers(projectPath);
+    const normalized: Record<string, any> = {};
+    for (const [name, config] of Object.entries(map ?? {})) {
+      if (!config) continue;
+      if (config.type === "http") {
+        if (!config.url) continue;
+        normalized[name] = {
+          type: "http",
+          url: config.url,
+          headers: config.headers || {}
+        };
+        continue;
+      }
+      const command = config.command;
+      if (!command) continue;
+      normalized[name] = {
+        type: "stdio",
+        command,
+        args: config.args,
+        env: config.env
+      };
+    }
+    return Object.keys(normalized).length ? normalized : undefined;
+  } catch (error) {
+    console.error("Failed to load MCP servers:", error);
+    return undefined;
+  }
+}
+
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, resumeSessionId, onEvent, onSessionUpdate } = options;
   const abortController = new AbortController();
+  const mcpServers = await loadMcpConfig(session.cwd);
 
   const sendMessage = (message: SDKMessage) => {
     onEvent({
@@ -51,6 +84,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           permissionMode: "bypassPermissions",
           includePartialMessages: true,
           allowDangerouslySkipPermissions: true,
+          mcpServers,
           canUseTool: async (toolName, input, { signal }) => {
             // For AskUserQuestion, we need to wait for user response
             if (toolName === "AskUserQuestion") {

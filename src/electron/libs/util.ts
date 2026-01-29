@@ -2,7 +2,7 @@ import { claudeCodeEnv } from "./claude-settings.js";
 import { unstable_v2_prompt } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
 import { app } from "electron";
-import { join } from "path";
+import { join, resolve } from "path";
 import { homedir } from "os";
 
 // Get Claude Code CLI path for packaged app
@@ -23,6 +23,7 @@ export function getEnhancedEnv(): Record<string, string | undefined> {
     '/usr/local/bin',
     '/opt/homebrew/bin',
     `${home}/.bun/bin`,
+    `${home}/.local/bin`,
     `${home}/.nvm/versions/node/v20.0.0/bin`,
     `${home}/.nvm/versions/node/v22.0.0/bin`,
     `${home}/.nvm/versions/node/v18.0.0/bin`,
@@ -63,3 +64,14 @@ export const generateSessionTitle = async (userIntent: string | null) => {
 
   return "New Session";
 };
+
+export function normalizeWorkingDirectory(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  try {
+    return resolve(trimmed);
+  } catch {
+    return trimmed;
+  }
+}

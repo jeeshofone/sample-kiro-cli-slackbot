@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientEvent } from "../types";
 import { useAppStore } from "../store/useAppStore";
+import { useEffectiveCwd } from "../hooks/useEffectiveCwd";
 
 const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Bash";
 const MAX_ROWS = 12;
@@ -11,20 +12,90 @@ interface PromptInputProps {
   sendEvent: (event: ClientEvent) => void;
 }
 
-export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
+export function usePromptActions(sendEvent: (event: ClientEvent) => void, effectiveCwd?: string) {
   const prompt = useAppStore((state) => state.prompt);
-  const cwd = useAppStore((state) => state.cwd);
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const sessions = useAppStore((state) => state.sessions);
   const setPrompt = useAppStore((state) => state.setPrompt);
   const setPendingStart = useAppStore((state) => state.setPendingStart);
   const setGlobalError = useAppStore((state) => state.setGlobalError);
+  const setShowStartModal = useAppStore((state) => state.setShowStartModal);
+  const cwd = useAppStore((state) => state.cwd);
+  const setCommandResult = useAppStore((state) => state.setCommandResult);
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
   const isRunning = activeSession?.status === "running";
 
+  const runSlashCommand = useCallback(async (raw: string) => {
+    const trimmed = raw.trim();
+    const workingDir = cwd.trim();
+    if (!trimmed) return;
+    if (!workingDir) {
+      setGlobalError("Set a working directory before running commands.");
+      return;
+    }
+    const payload = trimmed.startsWith("/") ? trimmed.slice(1).trim() : trimmed;
+    if (!payload) {
+      setGlobalError("Command is empty.");
+      return;
+    }
+    try {
+      const result = await window.electron.runClaudeCommand({ cwd: workingDir, command: payload });
+      setCommandResult({
+        command: trimmed,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        error: result.success ? undefined : (result.error || "Command failed"),
+        createdAt: Date.now()
+      });
+    } catch (error) {
+      setCommandResult({
+        command: trimmed,
+        error: error instanceof Error ? error.message : "Failed to run command",
+        createdAt: Date.now()
+      });
+    }
+  }, [cwd, setCommandResult, setGlobalError]);
+
   const handleSend = useCallback(async () => {
     if (!prompt.trim()) return;
+
+    if (prompt.trim().startsWith("/")) {
+      const workingDir = (effectiveCwd ?? cwd)?.trim();
+      if (!workingDir) {
+        setGlobalError("Set a working directory before running commands.");
+        return;
+      }
+      const command = prompt.trim().slice(1).trim();
+      if (!command) {
+        setGlobalError("Command is empty.");
+        return;
+      }
+      try {
+        const result = await window.electron.runClaudeCommand({ cwd: workingDir, command });
+        setCommandResult({
+          command: `/${command}`,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          error: result.success ? undefined : (result.error || "Command failed"),
+          createdAt: Date.now()
+        });
+      } catch (error) {
+        setCommandResult({
+          command: `/${command}`,
+          error: error instanceof Error ? error.message : "Failed to run command",
+          createdAt: Date.now()
+        });
+      }
+      setPrompt("");
+      return;
+    }
+
+    if (prompt.trim().startsWith("/")) {
+      await runSlashCommand(prompt);
+      setPrompt("");
+      return;
+    }
 
     if (!activeSessionId) {
       let title = "";
@@ -49,7 +120,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       sendEvent({ type: "session.continue", payload: { sessionId: activeSessionId, prompt } });
     }
     setPrompt("");
-  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt]);
+  }, [activeSession, activeSessionId, cwd, prompt, sendEvent, setGlobalError, setPendingStart, setPrompt, effectiveCwd, setCommandResult]);
 
   const handleStop = useCallback(() => {
     if (!activeSessionId) return;
@@ -61,15 +132,47 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
       setGlobalError("Working Directory is required to start a session.");
       return;
     }
+    if (!prompt.trim()) {
+      setShowStartModal(false);
+      return;
+    }
     handleSend();
-  }, [cwd, handleSend, setGlobalError]);
+  }, [cwd, handleSend, prompt, setGlobalError, setShowStartModal]);
 
   return { prompt, setPrompt, isRunning, handleSend, handleStop, handleStartFromModal };
 }
 
 export function PromptInput({ sendEvent }: PromptInputProps) {
-  const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent);
+  const effectiveCwd = useEffectiveCwd();
+  const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent, effectiveCwd);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<{ text: string; variant: "success" | "error" } | null>(null);
+
+  const handleUpload = useCallback(async () => {
+    setUploadMessage(null);
+    const cwd = effectiveCwd?.trim();
+    if (!cwd) {
+      setUploadMessage({ text: "Set a working directory before uploading files.", variant: "error" });
+      return;
+    }
+    const selected = await window.electron.selectFiles();
+    if (!selected || selected.length === 0) return;
+    const result = await window.electron.copyFilesToCwd({ cwd, files: selected });
+    if (!result.success) {
+      setUploadMessage({ text: result.error || "Failed to copy files.", variant: "error" });
+      return;
+    }
+    const names = (result.copied ?? []).map((f) => f.filename).join(", ");
+    const summary = result.copied?.length
+      ? `Added ${result.copied.length} file${result.copied.length > 1 ? "s" : ""}${names ? `: ${names}` : ""}`
+      : "Files copied.";
+    const failures = result.failed ?? [];
+    const hasFailures = failures.length > 0;
+    setUploadMessage({
+      text: hasFailures ? `${summary} (${failures.length} failed)` : summary,
+      variant: hasFailures ? "error" : "success"
+    });
+  }, [effectiveCwd]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey) return;
@@ -117,18 +220,37 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
           onInput={handleInput}
           ref={promptRef}
         />
-        <button
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRunning ? "bg-error text-white hover:bg-error/90" : "bg-accent text-white hover:bg-accent-hover"}`}
-          onClick={isRunning ? handleStop : handleSend}
-          aria-label={isRunning ? "Stop session" : "Send prompt"}
-        >
-          {isRunning ? (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l2.8 7.2L16 12l-9.8 1.4-2.8 7.2Z" fill="currentColor" /></svg>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-ink-900/20 text-ink-600 hover:bg-ink-900/5"
+            onClick={handleUpload}
+            title="Upload files into working directory"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M4 7h16v13H4z" />
+              <path d="M12 4v8" />
+              <path d="m8 8 4-4 4 4" />
+            </svg>
+          </button>
+          <button
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRunning ? "bg-error text-white hover:bg-error/90" : "bg-accent text-white hover:bg-accent-hover"}`}
+            onClick={isRunning ? handleStop : handleSend}
+            aria-label={isRunning ? "Stop session" : "Send prompt"}
+          >
+            {isRunning ? (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l2.8 7.2L16 12l-9.8 1.4-2.8 7.2Z" fill="currentColor" /></svg>
+            )}
+          </button>
+        </div>
       </div>
+      {uploadMessage && (
+        <div className={`mx-auto mt-2 max-w-3xl text-xs ${uploadMessage.variant === "error" ? "text-error" : "text-success"}`}>
+          {uploadMessage.text}
+        </div>
+      )}
     </section>
   );
 }

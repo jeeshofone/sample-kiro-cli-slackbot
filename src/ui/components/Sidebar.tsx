@@ -7,11 +7,13 @@ interface SidebarProps {
   connected: boolean;
   onNewSession: () => void;
   onDeleteSession: (sessionId: string) => void;
+  onOpenSettings: () => void;
 }
 
 export function Sidebar({
   onNewSession,
-  onDeleteSession
+  onDeleteSession,
+  onOpenSettings
 }: SidebarProps) {
   const sessions = useAppStore((state) => state.sessions);
   const activeSessionId = useAppStore((state) => state.activeSessionId);
@@ -79,7 +81,7 @@ export function Sidebar({
       >
         + New Task
       </button>
-      <div className="flex flex-col gap-2 overflow-y-auto">
+      <div className="flex flex-col gap-2 overflow-y-auto flex-1">
         {sessionList.length === 0 && (
           <div className="rounded-xl border border-ink-900/5 bg-surface px-4 py-5 text-center text-xs text-muted">
             No sessions yet. Start by sending a prompt.
@@ -134,6 +136,12 @@ export function Sidebar({
           </div>
         ))}
       </div>
+      <button
+        className="rounded-xl border border-ink-900/10 bg-white px-4 py-2.5 text-sm font-medium text-ink-700 hover:border-accent/40 hover:text-accent transition-colors"
+        onClick={onOpenSettings}
+      >
+        ⚙️ Settings
+      </button>
       <Dialog.Root open={!!resumeSessionId} onOpenChange={(open) => !open && setResumeSessionId(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm" />

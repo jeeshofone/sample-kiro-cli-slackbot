@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import type { ServerEvent, SessionStatus, StreamMessage } from "../types";
+import type { ServerEvent, SessionStatus, StreamMessage, CreatedFile } from "../types";
+
+export type CommandResult = {
+  command: string;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+  createdAt: number;
+};
 
 export type PermissionRequest = {
   toolUseId: string;
@@ -18,6 +26,7 @@ export type SessionView = {
   createdAt?: number;
   updatedAt?: number;
   hydrated: boolean;
+  createdFiles: CreatedFile[];
 };
 
 interface AppState {
@@ -30,6 +39,16 @@ interface AppState {
   sessionsLoaded: boolean;
   showStartModal: boolean;
   historyRequested: Set<string>;
+  commandResult: CommandResult | null;
+
+  // File sidebar state
+  fileSidebarOpen: boolean;
+  fileSidebarWidth: number;
+  openedFile: CreatedFile | null;
+  fileContent: string | null;
+  fileType: 'text' | 'image' | 'pdf' | 'excel' | 'ppt' | 'binary' | 'unknown' | null;
+  fileSheetNames: string[] | undefined;
+  fileLoading: boolean;
 
   setPrompt: (prompt: string) => void;
   setCwd: (cwd: string) => void;
@@ -39,11 +58,207 @@ interface AppState {
   setActiveSessionId: (id: string | null) => void;
   markHistoryRequested: (sessionId: string) => void;
   resolvePermissionRequest: (sessionId: string, toolUseId: string) => void;
+  setCommandResult: (result: CommandResult | null) => void;
   handleServerEvent: (event: ServerEvent) => void;
+
+  // File sidebar actions
+  setFileSidebarOpen: (open: boolean) => void;
+  setFileSidebarWidth: (width: number) => void;
+  setOpenedFile: (file: CreatedFile | null) => void;
+  setFileContent: (content: string | null) => void;
+  setFileType: (fileType: 'text' | 'image' | 'pdf' | 'excel' | 'ppt' | 'binary' | 'unknown' | null) => void;
+  setFileSheetNames: (sheetNames: string[] | undefined) => void;
+  setFileLoading: (loading: boolean) => void;
+  addCreatedFile: (sessionId: string, file: CreatedFile) => void;
+}
+
+const toolKindMap = new Map<string, CreatedFile["kind"]>();
+
+function getToolKey(sessionId: string, toolUseId: unknown): string | null {
+  return typeof toolUseId === "string" ? `${sessionId}:${toolUseId}` : null;
 }
 
 function createSession(id: string): SessionView {
-  return { id, title: "", status: "idle", messages: [], permissionRequests: [], hydrated: false };
+  return { id, title: "", status: "idle", messages: [], permissionRequests: [], hydrated: false, createdFiles: [] };
+}
+
+function getFileExtension(filePath: string): string {
+  const parts = filePath.split('.');
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+}
+
+function getFileName(filePath: string): string {
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || filePath;
+}
+
+function normalizeFilePath(filePath: string, cwd?: string): string {
+  let normalized = filePath.trim();
+  normalized = normalized.replace(/\\"/g, "").replace(/\\\\/g, "/").replace(/\\/g, "/");
+  const hasProtocol = /^[a-zA-Z]+:\/\//.test(normalized);
+  const hasDrive = /^[a-zA-Z]:/.test(normalized);
+
+  if (!hasProtocol && !hasDrive && cwd && !normalized.startsWith("/")) {
+    const base = cwd.replace(/\\/g, "/").replace(/\/+$/, "");
+    normalized = `${base}/${normalized}`;
+  }
+
+  normalized = normalized.replace(/\/+/g, "/");
+
+  const drivePrefix = hasDrive ? normalized.slice(0, 2) : "";
+  const withoutDrive = hasDrive ? normalized.slice(2) : normalized;
+  const isAbsolute = drivePrefix !== "" || withoutDrive.startsWith("/");
+  const segments = withoutDrive.split("/");
+
+  const stack: string[] = [];
+  for (const segment of segments) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (stack.length && stack[stack.length - 1] !== "..") {
+        stack.pop();
+      } else if (!isAbsolute) {
+        stack.push("..");
+      }
+      continue;
+    }
+    stack.push(segment);
+  }
+
+  let collapsed = stack.join("/");
+  if (drivePrefix) {
+    collapsed = `${drivePrefix}${collapsed ? `/${collapsed}` : ""}`;
+  } else if (isAbsolute) {
+    collapsed = `/${collapsed}`;
+  } else if (!collapsed) {
+    collapsed = ".";
+  }
+  return collapsed;
+}
+
+const ACCESS_TOOL_NAMES = new Set([
+  "read",
+  "filesystem_read",
+  "filesystem.read",
+  "file_read",
+  "file.read",
+  "read_file",
+  "readfile"
+]);
+
+function getFileKindForTool(toolName: unknown): CreatedFile["kind"] {
+  if (typeof toolName !== "string") return "created";
+  const normalized = toolName.toLowerCase();
+  if (ACCESS_TOOL_NAMES.has(normalized)) return "accessed";
+  if (normalized.includes("read") && !normalized.includes("spread")) return "accessed";
+  if (normalized.includes("glob") || normalized.includes("grep")) return "accessed";
+  return "created";
+}
+
+function extractFilesFromMessage(msg: StreamMessage, sessionId: string, cwd?: string): CreatedFile[] {
+  const files: CreatedFile[] = [];
+  const seenPaths = new Set<string>();
+
+  const addFile = (rawPath: string, kind: CreatedFile["kind"], source: CreatedFile["source"]) => {
+    const path = normalizeFilePath(rawPath, cwd);
+    if (seenPaths.has(path)) return;
+    seenPaths.add(path);
+    files.push({
+      path,
+      name: getFileName(path),
+      extension: getFileExtension(path),
+      createdAt: Date.now(),
+      sessionId,
+      kind,
+      source
+    });
+  };
+
+  let matchedToolKey: string | null = null;
+  try {
+    if (!msg || typeof msg !== "object") return files;
+
+    const anyMessage = msg as any;
+    if (anyMessage?.type === "assistant" && Array.isArray(anyMessage.message?.content)) {
+      for (const content of anyMessage.message.content) {
+        if (content?.type !== "tool_use") continue;
+        const input = content.input as Record<string, unknown> | undefined;
+        const filePath = typeof input?.file_path === "string" ? input.file_path :
+          typeof input?.path === "string" ? input.path : null;
+        if (!filePath) continue;
+        const kind = getFileKindForTool(content.name);
+        const key = getToolKey(sessionId, content.id);
+        if (key) toolKindMap.set(key, kind);
+        addFile(filePath, kind, "tool");
+      }
+    }
+
+    const msgStr = JSON.stringify(msg);
+    const binaryFileExtensions = /(?:^|[\s"'(])([\/\w][\w\/\-\.]*\.(xlsx|xls|xlsm|xlsb|csv|pdf|docx|doc|pptx|ppt|png|jpg|jpeg|gif|svg|zip|tar|gz))(?:[\s"'),]|$)/gi;
+    let binaryMatch;
+    let regexKind: CreatedFile["kind"] = anyMessage?.type === "assistant" ? "created" : "accessed";
+    if (anyMessage?.type === "user" && Array.isArray(anyMessage.message?.content)) {
+      const resultContent = anyMessage.message.content.find(
+        (item: any) => item?.type === "tool_result" && typeof item.tool_use_id === "string"
+      );
+      if (resultContent) {
+        matchedToolKey = getToolKey(sessionId, resultContent.tool_use_id);
+        regexKind = (matchedToolKey && toolKindMap.get(matchedToolKey)) || "accessed";
+      } else {
+        regexKind = "accessed";
+      }
+    }
+    while ((binaryMatch = binaryFileExtensions.exec(msgStr)) !== null) {
+      const rawPath = binaryMatch[1];
+      const filePath = rawPath.replace(/\\"/g, "").replace(/\\\//g, "/");
+      // Skip URLs, package paths, and very short matches
+      if (filePath.includes('://') ||
+          filePath.includes('node_modules') ||
+          filePath.includes('site-packages') ||
+          filePath.length < 3) {
+        continue;
+      }
+      addFile(filePath, regexKind, "regex");
+    }
+  } catch (e) {
+    console.error('Error extracting files from message:', e);
+  } finally {
+    if (matchedToolKey) {
+      toolKindMap.delete(matchedToolKey);
+    }
+  }
+  return files;
+}
+
+function shouldReplaceFile(existing: CreatedFile, incoming: CreatedFile): boolean {
+  if (existing.kind === incoming.kind) {
+    return existing.source === "regex" && incoming.source === "tool";
+  }
+
+  if (incoming.kind === "created") {
+    return true;
+  }
+
+  if (existing.kind === "created" && incoming.kind === "accessed") {
+    return existing.source === "regex" && incoming.source === "tool";
+  }
+
+  return false;
+}
+
+function extractAllFilesFromHistory(messages: StreamMessage[], sessionId: string, cwd?: string): CreatedFile[] {
+  const byPath = new Map<string, CreatedFile>();
+
+  for (const msg of messages) {
+    const extractedFiles = extractFilesFromMessage(msg, sessionId, cwd);
+    for (const file of extractedFiles) {
+      const existing = byPath.get(file.path);
+      if (!existing || shouldReplaceFile(existing, file)) {
+        byPath.set(file.path, file);
+      }
+    }
+  }
+
+  return Array.from(byPath.values());
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -56,6 +271,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionsLoaded: false,
   showStartModal: false,
   historyRequested: new Set(),
+  commandResult: null,
+
+  // File sidebar state
+  fileSidebarOpen: false,
+  fileSidebarWidth: 400,
+  openedFile: null,
+  fileContent: null,
+  fileType: null,
+  fileSheetNames: undefined,
+  fileLoading: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setCwd: (cwd) => set({ cwd }),
@@ -63,6 +288,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGlobalError: (globalError) => set({ globalError }),
   setShowStartModal: (showStartModal) => set({ showStartModal }),
   setActiveSessionId: (id) => set({ activeSessionId: id }),
+
+  // File sidebar actions
+  setFileSidebarOpen: (fileSidebarOpen) => set({ fileSidebarOpen }),
+  setFileSidebarWidth: (fileSidebarWidth) => set({ fileSidebarWidth }),
+  setOpenedFile: (openedFile) => set({ openedFile }),
+  setFileContent: (fileContent) => set({ fileContent }),
+  setFileType: (fileType) => set({ fileType }),
+  setFileSheetNames: (fileSheetNames) => set({ fileSheetNames }),
+  setFileLoading: (fileLoading) => set({ fileLoading }),
+  addCreatedFile: (sessionId, file) => {
+    set((state) => {
+      const existing = state.sessions[sessionId];
+      if (!existing) return {};
+      const files = [...existing.createdFiles];
+      const existingIndex = files.findIndex(f => f.path === file.path);
+      if (existingIndex >= 0) {
+        const current = files[existingIndex];
+        if (current.kind === "accessed" && file.kind === "created") {
+          files[existingIndex] = file;
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...existing,
+                createdFiles: files
+              }
+            }
+          };
+        }
+        return {};
+      }
+      files.push(file);
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...existing,
+            createdFiles: files
+          }
+        }
+      };
+    });
+  },
 
   markHistoryRequested: (sessionId) => {
     set((state) => {
@@ -87,6 +355,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     });
   },
+
+  setCommandResult: (result) => set({ commandResult: result }),
+
 
   handleServerEvent: (event) => {
     const state = get();
@@ -140,10 +411,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { sessionId, messages, status } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          const createdFiles = extractAllFilesFromHistory(messages, sessionId, existing.cwd);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, status, messages, hydrated: true }
+              [sessionId]: { ...existing, status, messages, hydrated: true, createdFiles }
             }
           };
         });
@@ -154,6 +426,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { sessionId, status, title, cwd } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          const shouldResetFiles = status !== "running";
           return {
             sessions: {
               ...state.sessions,
@@ -162,7 +435,8 @@ export const useAppStore = create<AppState>((set, get) => ({
                 status,
                 title: title ?? existing.title,
                 cwd: cwd ?? existing.cwd,
-                updatedAt: Date.now()
+                updatedAt: Date.now(),
+                createdFiles: shouldResetFiles ? [] : existing.createdFiles
               }
             }
           };
@@ -196,12 +470,35 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       case "stream.message": {
         const { sessionId, message } = event.payload;
+        const currentState = get();
+        const existingSession = currentState.sessions[sessionId];
+        const cwdForDetection = existingSession?.cwd;
+
+        const newFiles = extractFilesFromMessage(message, sessionId, cwdForDetection);
+
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          const updatedFiles = [...existing.createdFiles];
+
+          for (const newFile of newFiles) {
+            const index = updatedFiles.findIndex(f => f.path === newFile.path);
+            if (index === -1) {
+              updatedFiles.push(newFile);
+              continue;
+            }
+            if (shouldReplaceFile(updatedFiles[index], newFile)) {
+              updatedFiles[index] = newFile;
+            }
+          }
+
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, messages: [...existing.messages, message] }
+              [sessionId]: {
+                ...existing,
+                messages: [...existing.messages, message],
+                createdFiles: updatedFiles
+              }
             }
           };
         });

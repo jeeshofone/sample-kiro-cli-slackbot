@@ -183,6 +183,38 @@ bun run build
 
 ---
 
+## 🧩 AppleScript MCP Server (Optional)
+
+You can let Claude Cowork control local macOS apps through AppleScript by installing the community [osascript MCP server](https://github.com/k6l3/osascript-dxt):
+
+1. Install the MCP bundle CLI: `npm install -g @anthropic-ai/mcpb`
+2. Clone and build the bundle:
+   ```bash
+   git clone https://github.com/k6l3/osascript-dxt
+   cd osascript-dxt
+   mcpb pack
+   ```
+3. Copy the folder somewhere permanent (for example `~/Library/Application Support/Agent Cowork/mcp/osascript-dxt`) and install its dependencies with `bun install`.
+4. Register the server in `~/.claude/settings.json`:
+   ```json
+   {
+     "mcpServers": {
+       "osascript": {
+         "command": "node",
+         "args": [
+           "/Users/<you>/Library/Application Support/Agent Cowork/mcp/osascript-dxt/server/index.js"
+         ],
+         "env": {}
+       }
+     }
+   }
+   ```
+5. Restart Claude Cowork and enable the new `osascript` MCP tool from the Settings modal.
+
+Once configured, you can ask Claude to run AppleScript/osascript commands (with the normal permission prompts) to automate Finder, Mail, Safari, etc.
+
+---
+
 ## 🗺 Roadmap
 
 Planned features:
@@ -220,6 +252,5 @@ This project is built for you.
 ## License
 
 MIT
-
 
 

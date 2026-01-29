@@ -81,7 +81,7 @@ export function StartSessionModal({
             )}
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted">Prompt</span>
+            <span className="text-xs font-medium text-muted">Prompt (optional)</span>
             <textarea
               rows={4}
               className="rounded-xl border border-ink-900/10 bg-surface-secondary p-3 text-sm text-ink-800 placeholder:text-muted-light focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors resize-none"
@@ -93,7 +93,7 @@ export function StartSessionModal({
           <button
             className="flex flex-col items-center rounded-full bg-accent px-5 py-3 text-sm font-medium text-white shadow-soft hover:bg-accent-hover transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onStart}
-            disabled={pendingStart || !cwd.trim() || !prompt.trim()}
+            disabled={pendingStart || !cwd.trim()}
           >
             {pendingStart ? (
               <svg aria-hidden="true" className="w-5 h-5 animate-spin" viewBox="0 0 100 101" fill="none">

@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
@@ -9,6 +10,26 @@ export default function MDContent({ text }: { text: string }) {
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeRaw, rehypeHighlight]}
       components={{
+        a: ({ href, children, node: _node, ...anchorProps }) => {
+          const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+            if (!href) return;
+            event.preventDefault();
+            window.electron?.openExternalUrl?.(href);
+          };
+
+          return (
+            <a
+              href={href}
+              onClick={handleClick}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline decoration-1 underline-offset-2 hover:opacity-80"
+              {...anchorProps}
+            >
+              {children}
+            </a>
+          );
+        },
         h1: (props) => <h1 className="mt-4 text-xl font-semibold text-ink-900" {...props} />,
         h2: (props) => <h2 className="mt-4 text-lg font-semibold text-ink-900" {...props} />,
         h3: (props) => <h3 className="mt-3 text-base font-semibold text-ink-800" {...props} />,

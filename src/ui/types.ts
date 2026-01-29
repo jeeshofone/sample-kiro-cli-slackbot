@@ -1,4 +1,7 @@
 import type { SDKMessage, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+export type { McpServerConfig, McpServersMap } from "../shared/mcp";
+
+export type FileEntryKind = "created" | "accessed";
 
 export type UserPromptMessage = {
   type: "user_prompt";
@@ -6,6 +9,16 @@ export type UserPromptMessage = {
 };
 
 export type StreamMessage = SDKMessage | UserPromptMessage;
+
+export type CreatedFile = {
+  path: string;
+  name: string;
+  extension: string;
+  createdAt: number;
+  sessionId: string;
+  kind: FileEntryKind;
+  source: "tool" | "regex";
+};
 
 export type SessionStatus = "idle" | "running" | "completed" | "error";
 

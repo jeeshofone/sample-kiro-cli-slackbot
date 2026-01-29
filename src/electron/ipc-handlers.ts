@@ -4,6 +4,7 @@ import { runClaude, type RunnerHandle } from "./libs/runner.js";
 import { SessionStore } from "./libs/session-store.js";
 import { app } from "electron";
 import { join } from "path";
+import { normalizeWorkingDirectory } from "./libs/util.js";
 
 const DB_PATH = join(app.getPath("userData"), "sessions.db");
 const sessions = new SessionStore(DB_PATH);
@@ -63,8 +64,9 @@ export function handleClientEvent(event: ClientEvent) {
   }
 
   if (event.type === "session.start") {
+    const normalizedCwd = normalizeWorkingDirectory(event.payload.cwd);
     const session = sessions.createSession({
-      cwd: event.payload.cwd,
+      cwd: normalizedCwd,
       title: event.payload.title,
       allowedTools: event.payload.allowedTools,
       prompt: event.payload.prompt

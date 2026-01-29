@@ -6,7 +6,7 @@
         "dist-react"
     ],
     "extraResources": [
-        "dist-electron/preload.cjs"
+        "dist-electron/electron/preload.cjs"
     ],
     "asarUnpack": [
         "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
