@@ -29,6 +29,17 @@ To summarize:
 
 # Kiro Cowork is highly versatile
 
+Kiro Cowork has 500+ tools through Composio (ElevanLab for audio, HeyGen for video, Gmail, X tools etc.). 
+
+It can also use local MCPs for Excel and other development environments like Blender, Pencil Desktop etc. As long as you haev an MCP, it will figure out how to use it opportunistically.
+We have added **playwright** MCP to allow it ability to handle browsers.
+We have added **ZAI MCPs** to give it ability to deal with PDFs, Images etc. when the model being used is not multimodal.
+
+It also has a skill repository, e.g. to make 3D animation with threejs and professional video with Remotion. You can add more skills. Skills are loaded dynamically.
+That is how skills work.
+
+Even we don't know what it is fully capable of. Please give it a shot!
+
 ![Kiro Cowork Versatility](images/KiroApplications.png)
 
 ---
@@ -198,8 +209,7 @@ Replace_with_your_key field.
 
 - **Kiro CLI missing:** Ensure `kiro-cli` is installed or set `KIRO_CLI_PATH`.
 - **MCP server not showing:** Edit `~/.kiro/agents/agent_config.json` and refresh Settings.
-- **Slash commands do nothing:** Start a session first; slash commands require an active workspace.
-- **Long-running `execute_bash`:** Some commands (e.g., interactive `npx`) block until they finish. Add non-interactive flags or run manually if needed.
+- **Long-running `execute_bash`:** Some commands (e.g., interactive `npx`) block until they finish. You can ask Kiro Cowork to run them without user input.
 ---
 
 ## Sample Applications
