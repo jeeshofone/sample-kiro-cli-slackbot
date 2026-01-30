@@ -209,18 +209,20 @@ Replace_with_your_key field.
 5. Social media management
 6. Daily tasks (emails, scheduling)
 
-### Video Creation Example
+### Product Video Creation Example
 
 It has many skills for PPTs, Excel, Videos etc. Here is a simple promotional video it made using Remotion-Best-Practices skill.
 
   <a href="https://www.youtube.com/watch?v=s46r3NS1V38">
     <img src="https://img.youtube.com/vi/s46r3NS1V38/0.jpg" alt="Kiro announcement" width="100%">
   </a>
+-------
 
-
-  <a href="https://www.youtube.com/embed/468Kns96eLA">
-    <img src="https://www.youtube.com/embed/468Kns96eLA/0.jpg" alt="Converting article to video podcast" width="100%">
+### Converting articles to audio and video podcasts (great for making training videos)
+  <a href="https://www.youtube.com/watch?v=468Kns96eLA">
+    <img src="https://img.youtube.com/vi/468Kns96eLA/0.jpg" alt="Kiro announcement" width="100%">
   </a>
+-------
 
 ### Excel Modelling Example
 
