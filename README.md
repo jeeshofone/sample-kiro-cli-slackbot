@@ -304,7 +304,9 @@ However, the worst impact is when the CLI tries to run a command that needs user
 ---
 
 ## License
+
 The project started with this base https://github.com/DevAgentForge/Claude-Cowork which is under MIT. This project is also released under MIT. Kiro-CLI is an Amazon Web Services product (all right reserved).
+
 ---
 
 ## Comments on security
