@@ -24,10 +24,10 @@ sequenceDiagram
     Main-->>UI: session.status
 ```
 
-- SDK parses CLI stdout and exposes it as an async iterator.
-- Main forwards each event to the renderer immediately.
-- CLI’s own `~/.claude` logs are written for its benefit, but the app never reads them.
-- No polling or intermediate storage required for live updates.
+SDK parses CLI stdout and exposes it as an async iterator.
+Main forwards each event to the renderer immediately.
+CLI’s own `~/.claude` logs are written for its benefit, but the app never reads them.
+No polling or intermediate storage required for live updates.
 
 ## Kiro CLI + SQLite Polling
 
@@ -54,9 +54,9 @@ sequenceDiagram
     Main-->>UI: session.status
 ```
 
-- No SDK. We read Kiro’s conversation log (`conversations_v2` table) directly.
-- Runner polls for new history entries, converts them into `StreamMessage`s, and forwards them over IPC.
-- Our own `sessions.db` mirrors the stream so history persists between app launches.
+No SDK. We read Kiro’s conversation log (`conversations_v2` table) directly.
+Runner polls for new history entries, converts them into `StreamMessage`s, and forwards them over IPC.
+Our own `sessions.db` mirrors the stream so history persists between app launches.
 
 ## Comparison Table
 
