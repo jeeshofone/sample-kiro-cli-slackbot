@@ -1,4 +1,4 @@
-# Agent Cowork Architecture
+# Building Kiro Cowork as a fork of Agent Cowork
 
 ## Stack Snapshot
 
