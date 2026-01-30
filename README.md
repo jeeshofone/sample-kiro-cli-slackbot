@@ -46,7 +46,9 @@ Even we don't know what it is fully capable of. Please give it a shot!
 
 ---
 
-## Deceivingly simple interface
+## Deceptively simple interface
+
+Task: Make me an audio podcast of 3 minutes on moltbot controvery. I want to upload it to youtube, so create a display image and combine it with mp3 to give me an MP4.
 
 ![Kiro Cowork UX](images/KiroCowork.png)
 
