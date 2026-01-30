@@ -251,6 +251,12 @@ It has many skills for PPTs, Excel, Videos etc. Here is a simple promotional vid
 
 ### Converting articles to audio and video podcasts, great for making training videos (click on the image)
 You can give it article that you don't have time to read. It can convert them to audio podcasts.
+
+  <a href="https://www.youtube.com/watch?v=NSRqhYI8oeo">
+    <img src="https://img.youtube.com/vi/NSRqhYI8oeo/0.jpg" alt="Video podcast creation" width="100%">
+  </a>
+
+
 If you want to record a training video, you can give it text and it will make a perfectly edited video for you.
   <a href="https://www.youtube.com/watch?v=468Kns96eLA">
     <img src="https://img.youtube.com/vi/468Kns96eLA/0.jpg" alt="Video podcast creation" width="100%">
