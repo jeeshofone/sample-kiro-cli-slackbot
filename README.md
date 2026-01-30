@@ -297,12 +297,12 @@ It didn't just build great tables, it also built great meaningful visualizations
 However, the worst impact is when the CLI tries to run a command that needs user response when running it with "execute_bash". It just keeps waiting and the UX is not updated, so user doesn't understand what is going on.
 ---
 
-## Recommednations for the Kiro team
+## Recommednations for the Kiro team (Remove before open sourcing on Github)
 
 1. Allow Kiro-CLI to stream its output as JSON responses as Claude Code CLI does. This makes integration easy, even in absence of an official Kiro SDK.
-2. Deliver Kiro SDK no later than Feb 2026. Kiro CLI has potential to be used as general purpose agent, as well as, as a building block for enterprise applications.
-3. Enable token based billing in Kiro CLI so enterprise could use it as a building block for their agentic application.
-4. Enable sandbox feature in Kiro-CLI ASAP so its access on the local desktop can be limited.
+2. Deliver Kiro SDK no later than Feb 2026. Kiro CLI has potential to be used as general purpose agent, as well as, as a building block for enterprise applications. However, not having an official SDK makes it hard.
+3. Enable **token based billing** in Kiro CLI i.e. allow people to use their Bedrock keys so enterprise could use it as a building block for their agentic application.
+4. Enable **sandbox** feature in Kiro-CLI ASAP so its access on the local desktop can be limited.
 ---
 
 ## License
