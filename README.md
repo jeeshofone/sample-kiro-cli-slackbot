@@ -278,6 +278,7 @@ It didn't just build great tables, it also built great meaningful visualizations
 2. Run `bun run dev` for iterative changes.
 3. Update docs (`docs/ARCHITECTURE.md`, `docs/INTEGRATION.md`, this `README.md`) when touching architecture or UX.
 4. Open a merge request with a clear summary and testing notes.
+---
 
 ## Roadmap
 
@@ -286,11 +287,16 @@ It didn't just build great tables, it also built great meaningful visualizations
 3. Sanbox to working directory and select network addresses (Kiro CLI does not yet support Sandboxing)
 4. Integrate Kiro CLI with help of Kiro SDK once it is released, replacing current arrangement of getting Kiro-CLI responses through SQLLite database. It makes the application a bit slow.
 However, the worst impact is when the CLI tries to run a command that needs user response when running it with "execute_bash". It just keeps waiting and the UX is not updated, so user doesn't understand what is going on.
+---
 
 ## Recommednations for the Kiro team
 
 1. Allow Kiro-CLI to stream its output as JSON responses as Claude Agents SDK does
 2. Deliver Kiro SDK no later than Feb 2026. Kiro CLI has potential to be used as general purpose agent, as well as, a building block for enterprise applications.
 3. Enable token based billing in Kiro CLI so enterprise could use it as a building block for their agentic application.
+---
+
+## License
+The project started with this base https://github.com/DevAgentForge/Claude-Cowork which is under MIT. This project is also released under MIT. Kiro-CLI is an Amazon Web Services product (all right reserved).
 
 
