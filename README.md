@@ -72,20 +72,7 @@ Available models today:
 - `glm-4.7-flash`
 - `qwen3-coder-next`
 
-## Promoting builder culture
-
-Launch of Claude Cowrker closely followed by OpenClaw (earlier called Clawdbot, later named to Moltbot) has worken up the popular culture to the power of general purpose agents.
-We want Amazonians and Amazon customers to equally be able to build general purpose agents following their approches but secure and scalable AWS stack.
-
-Hence, we document this project extensively in the /docs folder: 
-[ARCHITECTURE.md](/docs/ARCHITECTURE.md),
-[INTEGRATION.md](/docs/INTEGRATION.md),
-[GITLAB.md](/docs/GITLAB.md),
-[WORKING_DIRECTORY](/docs/WORKING_DIRECTORY.md).
-
-
-
-We highly encourage you to start contributing to the project. Kiro-CLI is awesome. Let us show its power to the society.
+We highly encourage you to start contributing to the project. Kiro-CLI (which wraps Kiro Agents) is awesome. Let us have fun with it
 
 ---
 
@@ -311,10 +298,8 @@ It didn't just build great tables, it also built great meaningful visualizations
 ## Roadmap
 
 1. Add voice interface
-2. Fix the issue with MCP Servers that need Web Socket connections (e.g. Pencil Desktop MCP). This issue is not there when using Claude Code CLI.
-3. Sanbox to working directory and select network addresses (Kiro CLI does not yet support Sandboxing)
-4. Integrate Kiro CLI with help of Kiro SDK once it is released (due soon), replacing current arrangement of getting Kiro-CLI responses through SQLLite database. 
-However, the worst impact is when the CLI tries to run a command that needs user response when running it with "execute_bash". It just keeps waiting and the UX is not updated, so user doesn't understand what is going on.
+2. Sanbox to working directory and select network addresses (Kiro CLI does not yet support Sandboxing)
+3. Integrate Kiro CLI with help of Kiro SDK once it is released (due soon), replacing current arrangement of getting Kiro-CLI responses through SQLLite database. 
 ---
 
 ## License
@@ -328,11 +313,10 @@ The project started with this base https://github.com/DevAgentForge/Claude-Cowor
 It runs on local machine, and accesses files from working directories. It access models on Bedrock through Kiro-CLI. It is no different from using Kiro-CLI. It calls external APIs with users’ own account (OAuth). These are the services that users already trust. There is a proper login flow that helps user log in into services like ElevanLabs, HeyGen, Gmail etc.
 Local MCPs like excel, playwright don’t need credentials. We also use ZAI MCPs for dealing with PDFs, Images etc. It gets automatically used if the model being used is not multimodal. User can remove any of the MCPs they don’t prefer.
 
-This project is to be used only with non-sensitive, non official data.  Typical advisory applicable for any GenAI service applies to this one.
+Typical advisory applicable for any GenAI service applies to this one.
 
 **Remember this is not a production ready project for your sensitive data!**
 
 **Remember this is not a reference architecture, but a prototype.**
-
 
 If a model works in `kiro-cli`, it works in Kiro Assistant. So for example, MiniMax M2 can be selected in Kiro CLI, so it will work with Kiro Assistant.
