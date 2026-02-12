@@ -309,7 +309,7 @@ It has many skills for PPTs, Excel, Videos etc. Here is a simple promotional vid
 
 ## Contributing
 
-1. Fork or clone `https://gitlab.aws.dev/wwps-asean-sa-genai/Kiro-Cowork`.
+1. Fork or clone `https://github.com/aws-samples/sample-kiro-assistant.git`.
 2. Run `bun run dev` for iterative changes.
 3. Update docs when touching architecture or UX.
 4. Open a pull request with a clear summary and testing notes.
