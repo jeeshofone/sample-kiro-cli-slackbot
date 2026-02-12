@@ -149,8 +149,7 @@ bun run dist:mac
 ```
 
 The macOS bundle is emitted to `dist/mac-arm64/Kiro Assistant.app`. Copy it into `/Applications` (back up any previous version first).
-
-> We spawn `kiro-cli chat --no-interactive --trust-all-tools --wrap never --model <selected-model> --agent kiro-assistant`. Pick the model from Settings → Default Model (or let it use the built-in default).
+You can also build and run it for Windows machines.
 
 ---
 
