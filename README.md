@@ -126,6 +126,43 @@ npm start
 | `KIRO_CLI_PATH` | No | Custom path to kiro-cli binary |
 | `TOOL_APPROVAL` | No | `auto` (approve all, default) or `interactive` (Slack buttons) |
 
+## Projects
+
+Projects let you point the bot at a specific codebase and agent. Start a thread with `[project-name]` to use one:
+
+```
+@kiro-bot [sirius] what's the deployment status?
+```
+
+### Register via Slack
+
+```
+@kiro-bot /projects                              # list registered projects
+@kiro-bot /register myapp /path/to/myapp myagent # register a project
+@kiro-bot /unregister myapp                      # remove a project
+```
+
+### Register via file
+
+Create a `projects.json` in the repo root (see `projects.example.json`):
+
+```json
+[
+  {
+    "name": "sirius",
+    "cwd": "/Users/you/code/sirius",
+    "agent": "findsirius"
+  }
+]
+```
+
+Each project needs:
+- `name` — what you type in `[brackets]`
+- `cwd` — absolute path to the project root
+- `agent` — name of a Kiro agent (from `~/.kiro/agents/` or the project's `.kiro/agents/`)
+
+Threads without a `[project]` prefix use a temporary workspace and the default agent.
+
 ## Deploy with PM2
 
 ```bash

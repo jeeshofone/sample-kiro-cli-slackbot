@@ -6,6 +6,7 @@ import { ensureWorkspaceRoot } from "../kiro/workspace.js";
 type SessionEntry = {
   sessionId: string;
   cwd: string;
+  agent?: string;
   createdAt: number;
 };
 

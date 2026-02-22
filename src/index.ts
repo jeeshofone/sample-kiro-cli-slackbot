@@ -5,15 +5,17 @@ import { AcpClient } from "./acp/client.js";
 import type { SessionUpdate } from "./acp/types.js";
 import { getSession, setSession } from "./store/session-store.js";
 import { createWorkspaceDir } from "./kiro/workspace.js";
+import { parseProject, listProjects, addProject, removeProject } from "./store/projects.js";
 import { SlackSender } from "./slack/message-sender.js";
 import { logger } from "./logger.js";
 
 const { App: BoltApp } = App;
 
 // --- State ---
-let acp: AcpClient;
+// Per-agent ACP clients: agentKey → AcpClient
+const acpClients = new Map<string, AcpClient>();
 const activeSenders = new Map<string, SlackSender>(); // sessionId → sender
-const pendingPermissions = new Map<string, { acpRequestId: string | number; sessionId: string }>(); // actionId → permission info
+const pendingPermissions = new Map<string, { acpRequestId: string | number; sessionId: string; acpClient: AcpClient }>(); // actionId → permission info
 
 // We use a simple lock: only one prompt at a time.
 // When a prompt is active, new messages wait. turn_end releases the lock.
@@ -39,32 +41,28 @@ function releasePromptLock(): void {
 }
 
 // --- ACP lifecycle ---
-async function ensureAcp(): Promise<AcpClient> {
-  if (acp?.alive) return acp;
-  acp = new AcpClient();
-
-  acp.on("permission", (sessionId: string, acpRequestId: string | number, toolCall: any, options: any[]) => {
+function wireAcpEvents(client: AcpClient): void {
+  client.on("permission", (sessionId: string, acpRequestId: string | number, toolCall: any, options: any[]) => {
     if (config.toolApproval === "auto") {
-      acp.resolvePermission(acpRequestId, "allow_always");
+      client.resolvePermission(acpRequestId, "allow_always");
       return;
     }
-    // Interactive: post buttons to Slack
     const sender = activeSenders.get(sessionId);
     if (!sender) {
-      acp.resolvePermission(acpRequestId, "allow_always");
+      client.resolvePermission(acpRequestId, "allow_always");
       return;
     }
     const actionId = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    pendingPermissions.set(actionId, { acpRequestId, sessionId });
+    pendingPermissions.set(actionId, { acpRequestId, sessionId, acpClient: client });
     const title = toolCall?.title ?? "Tool call";
     sender.postPermissionPrompt(title, actionId, options).catch((e) => {
       logger.error(e, "failed to post permission prompt");
-      acp.resolvePermission(acpRequestId, "allow_always"); // fallback
+      client.resolvePermission(acpRequestId, "allow_always");
       pendingPermissions.delete(actionId);
     });
   });
 
-  acp.on("update", (sessionId: string, update: SessionUpdate) => {
+  client.on("update", (sessionId: string, update: SessionUpdate) => {
     const sender = activeSenders.get(sessionId);
     if (!sender) {
       logger.warn({ sessionId, type: update.sessionUpdate }, "update for unknown sender");
@@ -81,13 +79,10 @@ async function ensureAcp(): Promise<AcpClient> {
         const u = update as any;
         const title = u.title ?? "tool";
         const kind = u.kind ?? "";
-        // Skip generic "shell"/"write" titles — wait for the descriptive one
         if (u.status === "in_progress" && title === kind) break;
-        // Show tool start with descriptive title
         if (title !== kind) {
           sender.appendDelta(`\n🔧 _${title}_\n`).catch((e) => logger.error(e, "tool status failed"));
         }
-        // Show diff content for file edits
         if (u.content) {
           for (const c of u.content) {
             if (c.type === "diff" && c.newText != null) {
@@ -103,7 +98,6 @@ async function ensureAcp(): Promise<AcpClient> {
         const u = update as any;
         const title = u.title ?? "tool";
         const status = u.status ?? "";
-        // Show command output on completion
         if (status === "completed" && u.rawOutput?.items) {
           for (const item of u.rawOutput.items) {
             if (item.Json) {
@@ -127,7 +121,7 @@ async function ensureAcp(): Promise<AcpClient> {
     }
   });
 
-  acp.on("turn_end", (sessionId: string) => {
+  client.on("turn_end", (sessionId: string) => {
     logger.info({ sessionId }, "turn_end");
     const sender = activeSenders.get(sessionId);
     if (sender) {
@@ -137,20 +131,61 @@ async function ensureAcp(): Promise<AcpClient> {
     releasePromptLock();
   });
 
-  acp.on("error", (err: Error) => logger.error(err, "ACP error"));
-  acp.on("exit", () => {
+  client.on("error", (err: Error) => logger.error(err, "ACP error"));
+  client.on("exit", () => {
     logger.warn("ACP exited, will restart on next message");
-    releasePromptLock(); // unblock queue if stuck
+    releasePromptLock();
   });
+}
 
-  await acp.start();
-  return acp;
+async function getAcpClient(agent?: string): Promise<AcpClient> {
+  const key = agent ?? config.kiroAgent;
+  const existing = acpClients.get(key);
+  if (existing?.alive) return existing;
+  const client = new AcpClient(agent);
+  wireAcpEvents(client);
+  await client.start();
+  acpClients.set(key, client);
+  return client;
 }
 
 // --- Extract user text from Slack message, stripping the bot mention ---
 function extractText(text: string | undefined): string {
   if (!text) return "";
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
+}
+
+// --- Bot commands (handled before sending to ACP) ---
+async function handleBotCommand(text: string, channel: string, threadTs: string, client: any): Promise<boolean> {
+  const trimmed = text.trim();
+
+  if (trimmed === "/projects" || trimmed === "/list") {
+    const projects = listProjects();
+    if (projects.length === 0) {
+      await client.chat.postMessage({ channel, thread_ts: threadTs, text: "No projects registered. Use `/register <name> <path> [agent]` to add one." });
+    } else {
+      const lines = projects.map((p) => `• *${p.name}* — \`${p.cwd}\` (agent: \`${p.agent}\`)`);
+      await client.chat.postMessage({ channel, thread_ts: threadTs, text: `📂 *Registered projects:*\n${lines.join("\n")}\n\n_Start a thread with \`[project-name] your message\` to use one._` });
+    }
+    return true;
+  }
+
+  const regMatch = trimmed.match(/^\/register\s+(\S+)\s+(\S+)(?:\s+(\S+))?$/);
+  if (regMatch) {
+    const [, name, cwd, agent] = regMatch;
+    addProject({ name, cwd, agent: agent ?? "kiro-assistant" });
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `✅ Registered project *${name}*\n• Path: \`${cwd}\`\n• Agent: \`${agent ?? "kiro-assistant"}\`\n\n_Use \`[${name}] your message\` to start a thread._` });
+    return true;
+  }
+
+  const unregMatch = trimmed.match(/^\/unregister\s+(\S+)$/);
+  if (unregMatch) {
+    const removed = removeProject(unregMatch[1]);
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: removed ? `🗑️ Removed project *${unregMatch[1]}*` : `❓ Project *${unregMatch[1]}* not found.` });
+    return true;
+  }
+
+  return false;
 }
 
 // --- Handle a message (shared by app_mention and DM) ---
@@ -164,24 +199,28 @@ async function handleMessage(
 ): Promise<void> {
   logger.info({ channel, threadTs, userText: userText.slice(0, 80) }, "handling message");
 
-  // Wait for any active prompt to finish
+  // Check for bot commands first
+  if (await handleBotCommand(userText, channel, threadTs, client)) return;
+
   await acquirePromptLock();
   logger.info("prompt lock acquired");
 
   try {
-    const acpClient = await ensureAcp();
     const existing = getSession(channel, threadTs);
 
     let sessionId: string;
     let cwd: string;
+    let agent: string | undefined;
 
     if (existing) {
+      // Existing thread — reuse project/agent
       sessionId = existing.sessionId;
       cwd = existing.cwd;
-      logger.info({ sessionId }, "loading existing session");
+      agent = existing.agent;
+      const acpClient = await getAcpClient(agent);
+      logger.info({ sessionId, agent }, "loading existing session");
       try {
         await acpClient.loadSession(sessionId, cwd);
-        // Wait a tick for any history replay notifications to flush
         await new Promise((r) => setTimeout(r, 100));
       } catch (err) {
         logger.warn({ err }, "session/load failed, creating new");
@@ -189,22 +228,40 @@ async function handleMessage(
         const info = await acpClient.createSession(ws);
         sessionId = info.sessionId;
         cwd = ws;
-        setSession(channel, threadTs, { sessionId, cwd, createdAt: Date.now() });
+        setSession(channel, threadTs, { sessionId, cwd, agent, createdAt: Date.now() });
       }
+
+      const sender = new SlackSender(client, channel, threadTs, teamId, userId);
+      activeSenders.set(sessionId, sender);
+      await acpClient.prompt(sessionId, userText);
     } else {
-      cwd = config.defaultCwd ?? createWorkspaceDir();
+      // New thread — check for [project] prefix
+      const { project, rest } = parseProject(userText);
+      const promptText = rest || userText;
+
+      if (project) {
+        cwd = project.cwd;
+        agent = project.agent;
+        logger.info({ project: project.name, cwd, agent }, "using project");
+      } else {
+        cwd = config.defaultCwd ?? createWorkspaceDir();
+      }
+
+      const acpClient = await getAcpClient(agent);
       const info = await acpClient.createSession(cwd);
       sessionId = info.sessionId;
-      logger.info({ sessionId, cwd }, "created new session");
-      setSession(channel, threadTs, { sessionId, cwd, createdAt: Date.now() });
+      logger.info({ sessionId, cwd, agent }, "created new session");
+      setSession(channel, threadTs, { sessionId, cwd, agent, createdAt: Date.now() });
+
+      const sender = new SlackSender(client, channel, threadTs, teamId, userId);
+      activeSenders.set(sessionId, sender);
+
+      if (project) {
+        sender.appendDelta(`📂 _Project: ${project.name}_ · \`${cwd}\`\n\n`).catch(() => {});
+      }
+
+      await acpClient.prompt(sessionId, promptText);
     }
-
-    const sender = new SlackSender(client, channel, threadTs, teamId, userId);
-    activeSenders.set(sessionId, sender);
-
-    logger.info({ sessionId }, "sending prompt");
-    await acpClient.prompt(sessionId, userText);
-    // prompt is fire-and-forget; turn_end will release the lock
   } catch (err) {
     logger.error(err, "handleMessage failed");
     releasePromptLock();
@@ -279,7 +336,7 @@ app.action(/^perm_/, async ({ action, ack, body }) => {
     label = "🚫 Rejected";
   }
 
-  acp.resolvePermission(pending.acpRequestId, optionId);
+  pending.acpClient.resolvePermission(pending.acpRequestId, optionId);
   try {
     await app.client.chat.update({
       channel: (body as any).channel?.id ?? (body as any).container?.channel_id,
@@ -293,11 +350,13 @@ app.action(/^perm_/, async ({ action, ack, body }) => {
 // --- Graceful shutdown ---
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "shutting down");
-  if (acp?.alive) {
-    for (const sessionId of activeSenders.keys()) {
-      await acp.cancel(sessionId).catch(() => {});
+  for (const [, client] of acpClients) {
+    if (client.alive) {
+      for (const sessionId of activeSenders.keys()) {
+        await client.cancel(sessionId).catch(() => {});
+      }
+      client.kill();
     }
-    acp.kill();
   }
   await app.stop();
   process.exit(0);

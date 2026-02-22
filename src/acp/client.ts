@@ -29,10 +29,13 @@ export class AcpClient extends EventEmitter {
   private terminals = new Map<string, { proc: ChildProcess; output: string; exitCode: number | null; cwd?: string }>();
   private terminalCounter = 0;
 
+  constructor(private agentOverride?: string) { super(); }
+
   async start(): Promise<void> {
     const binary = resolveKiroCliBinary();
     if (!binary) throw new Error("kiro-cli not found");
-    const args = ["acp", "--agent", config.kiroAgent];
+    const agent = this.agentOverride ?? config.kiroAgent;
+    const args = ["acp", "--agent", agent];
     logger.info({ binary, args }, "spawning kiro-cli acp");
 
     this.proc = spawn(binary, args, {
