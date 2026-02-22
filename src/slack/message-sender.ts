@@ -85,11 +85,6 @@ export class SlackSender {
     }
   }
 
-  async toolStatus(toolName: string, status: "running" | "done" | "failed"): Promise<void> {
-    const icon = status === "running" ? "🔧" : status === "done" ? "✅" : "❌";
-    await this.appendDelta(`\n${icon} _${toolName}_\n`);
-  }
-
   async finish(): Promise<void> {
     await this.queue;
     if (this.streamer) {
@@ -106,25 +101,6 @@ export class SlackSender {
       channel: this.channel,
       thread_ts: this.threadTs,
       text: `⚠️ ${text}`,
-    });
-  }
-
-  async postPermissionPrompt(title: string, actionId: string, _options: any[]): Promise<void> {
-    await this.client.chat.postMessage({
-      channel: this.channel,
-      thread_ts: this.threadTs,
-      text: `🔐 Permission: ${title}`,
-      blocks: [
-        { type: "section", text: { type: "mrkdwn", text: `🔐 *${title}*` } },
-        {
-          type: "actions",
-          elements: [
-            { type: "button", text: { type: "plain_text", text: "Trust (session)" }, action_id: `${actionId}_trust`, style: "primary" },
-            { type: "button", text: { type: "plain_text", text: "Yes (once)" }, action_id: `${actionId}_approve` },
-            { type: "button", text: { type: "plain_text", text: "No" }, action_id: `${actionId}_reject`, style: "danger" },
-          ],
-        },
-      ],
     });
   }
 }

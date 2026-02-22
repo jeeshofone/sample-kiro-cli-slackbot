@@ -1,29 +1,32 @@
 # Kiro CLI Slack Bot
 
-> Forked from [aws-samples/sample-kiro-assistant](https://github.com/aws-samples/sample-kiro-assistant) — the original Electron desktop app has been replaced with a headless Slack bot using the ACP protocol.
+> Forked from [aws-samples/sample-kiro-assistant](https://github.com/aws-samples/sample-kiro-assistant) — the original Electron desktop app has been replaced with a headless Slack bot using the same `kiro-cli chat` backend.
 
-A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) using the **ACP (Agent Client Protocol)** over stdin/stdout. Each Slack thread maps to a persistent Kiro session with its own working directory.
+A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) via `kiro-cli chat`. Each Slack thread maps to a persistent Kiro conversation keyed by working directory, with `--resume` for follow-ups.
 
 ## Features
 
-- **Thread-based sessions** — each Slack thread maps to a persistent Kiro ACP session
-- **Real-time streaming** — responses stream via Slack's native `ChatStreamer` API
-- **Verbose tool output** — file diffs, shell command output, and exit codes shown inline
-- **Interactive tool approval** — Trust (session) / Yes (once) / No buttons, matching Kiro CLI behavior
-- **Auto-approve mode** — skip permission prompts for trusted environments
+- **Thread-based sessions** — each Slack thread maps to a persistent Kiro conversation
+- **Real-time streaming** — responses stream via Slack's native `ChatStreamer` API (polled from Kiro's SQLite conversation log)
+- **Verbose tool output** — tool calls and results shown inline
+- **Model display** — shows the model from agent config in the thread header
+- **Kiro CLI commands** — `/model`, `/compact`, `/clear`, `/agent`, `/cost`, `/context`, `/help` run directly via `kiro-cli`
+- **Per-project support** — different agents, models, and working directories per Slack thread
 - **DM support** — direct message the bot without @mentioning
 - **Access control** — restrict usage to specific Slack user IDs
+- **`--resume` for follow-ups** — follow-up messages in a thread resume the existing conversation
+- **`--trust-all-tools`** — no permission prompts, matching the original project's approach
 
 ## How it works
 
 ```
-@kiro in Slack  →  ACP session/new + session/prompt
+@kiro in Slack  →  kiro-cli chat --trust-all-tools --agent X --model Y "prompt"
   ↓
-Kiro streams tool_call / agent_message_chunk  →  Slack ChatStreamer
+kiro-cli writes to SQLite  →  poll every 750ms  →  Slack ChatStreamer
   ↓
-Permission needed?  →  Slack buttons (Trust/Yes/No)  →  ACP response
+Process exits  →  final sync  →  ✅ reaction
   ↓
-TurnEnd  →  stream finalized
+Follow-up in thread  →  kiro-cli chat --resume "next prompt"
 ```
 
 ## Prerequisites
@@ -67,7 +70,7 @@ Socket Mode lets the bot connect via outbound WebSocket — no public URL needed
 | `channels:read` | List channels the bot is in |
 | `im:history` | Read DM messages |
 | `im:write` | Send DMs |
-| `reactions:write` | Add 👀 and 🚫 reaction indicators |
+| `reactions:write` | Add ⏳ and ✅ reaction indicators |
 | `users:read` | Look up user info |
 
 ### 4. Subscribe to events
@@ -120,11 +123,26 @@ npm start
 | `SLACK_BOT_TOKEN` | Yes | Bot token (`xoxb-...`) |
 | `SLACK_APP_TOKEN` | Yes | App-level token (`xapp-...`) |
 | `ALLOWED_USER_IDS` | No | Comma-separated Slack user IDs to restrict access |
-| `KIRO_AGENT` | No | Kiro agent name (default: `kiro-assistant`) |
+| `KIRO_AGENT` | No | Default Kiro agent name (default: `default`) |
 | `WORKSPACE_ROOT` | No | Base dir for per-thread workspaces (default: `~/Documents/workspace-kiro-slack`) |
 | `DEFAULT_CWD` | No | Default working directory for new sessions |
 | `KIRO_CLI_PATH` | No | Custom path to kiro-cli binary |
-| `TOOL_APPROVAL` | No | `auto` (approve all, default) or `interactive` (Slack buttons) |
+
+## Kiro CLI Commands
+
+In any thread with an active session, you can run Kiro CLI commands directly:
+
+| Command | Description |
+|---------|-------------|
+| `/model` | Show or change the current model |
+| `/compact` | Compact conversation history |
+| `/clear` | Clear conversation history |
+| `/agent` | Show or change the agent |
+| `/context` | Show context usage |
+| `/cost` | Show token/cost usage |
+| `/help` | Show Kiro CLI help |
+
+These run `kiro-cli <command>` in the thread's working directory and post the output back to Slack.
 
 ## Projects
 
@@ -173,7 +191,7 @@ pm2 save
 
 ## Security Notes
 
-- **Do not use `--trust-all-tools`** — the bot uses the agent config at `~/.kiro/agents/agent_config.json` which has an explicit `allowedTools` list
+- The bot uses `--trust-all-tools` — all tool calls are auto-approved
 - Set `ALLOWED_USER_IDS` to restrict who can interact with the bot
 - Consider running as a dedicated macOS user with limited filesystem permissions
 
@@ -184,16 +202,18 @@ src/
 ├── index.ts                 # Bolt app, event handlers, serial queue
 ├── config.ts                # Env var config
 ├── logger.ts                # Pino structured logging
-├── acp/
-│   ├── client.ts            # ACP JSON-RPC client (spawns kiro-cli acp)
-│   └── types.ts             # ACP protocol types
+├── kiro/
+│   ├── runner.ts            # Spawns kiro-cli chat, polls SQLite conversation log
+│   ├── conversation.ts      # Reads Kiro's SQLite conversation DB
+│   ├── command.ts           # Runs kiro-cli subcommands (slash commands)
+│   ├── cli-resolver.ts      # Find kiro-cli binary
+│   ├── agent-config.ts      # Read model from agent config
+│   └── workspace.ts         # Per-thread workspace directories
 ├── slack/
 │   └── message-sender.ts    # ChatStreamer wrapper with overflow handling
-├── kiro/
-│   ├── cli-resolver.ts      # Find kiro-cli binary
-│   └── workspace.ts         # Per-thread workspace directories
 └── store/
-    └── session-store.ts     # Thread→session mapping (JSON file)
+    ├── session-store.ts     # Thread→session mapping (JSON file)
+    └── projects.ts          # Project registry
 ```
 
 ## License

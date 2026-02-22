@@ -3,41 +3,25 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { logger } from "../logger.js";
 
-type AcpMcpServer = { name: string; command: string; args: string[]; env: { name: string; value: string }[] };
+export type AgentInfo = { model?: string };
 
-/**
- * Load an agent's mcpServers config and convert to ACP format.
- * Searches project-local .kiro/agents/ first, then global ~/.kiro/agents/.
- */
-export function loadAgentMcpServers(agent: string, projectCwd?: string): AcpMcpServer[] {
+function findAgentConfig(agent: string, projectCwd?: string): string | undefined {
   const paths = [
     projectCwd ? join(projectCwd, ".kiro", "agents", `${agent}.json`) : "",
     join(homedir(), ".kiro", "agents", `${agent}.json`),
   ].filter(Boolean);
+  return paths.find((p) => existsSync(p));
+}
 
-  for (const p of paths) {
-    if (!existsSync(p)) continue;
-    try {
-      const config = JSON.parse(readFileSync(p, "utf-8"));
-      const servers = config.mcpServers;
-      if (!servers || typeof servers !== "object") continue;
+function readConfig(path: string): Record<string, unknown> | null {
+  try { return JSON.parse(readFileSync(path, "utf-8")); } catch { return null; }
+}
 
-      const result: AcpMcpServer[] = [];
-      for (const [name, def] of Object.entries(servers) as [string, any][]) {
-        if (!def.command) continue;
-        const env: { name: string; value: string }[] = [];
-        if (def.env && typeof def.env === "object") {
-          for (const [k, v] of Object.entries(def.env)) {
-            env.push({ name: k, value: String(v) });
-          }
-        }
-        result.push({ name, command: def.command, args: def.args ?? [], env });
-      }
-      logger.info({ agent, path: p, servers: result.map((s) => s.name) }, "loaded agent MCP servers");
-      return result;
-    } catch (e) {
-      logger.warn({ agent, path: p, err: e }, "failed to load agent config");
-    }
-  }
-  return [];
+/** Load model name from agent config */
+export function loadAgentInfo(agent: string, projectCwd?: string): AgentInfo {
+  const p = findAgentConfig(agent, projectCwd);
+  if (!p) return {};
+  const config = readConfig(p);
+  if (!config) return {};
+  return { model: typeof config.model === "string" ? config.model : undefined };
 }

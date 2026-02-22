@@ -19,5 +19,4 @@ export const config = {
   kiroAgent: env("KIRO_AGENT", "default"),
   workspaceRoot: expandHome(env("WORKSPACE_ROOT", "~/Documents/workspace-kiro-slack")),
   defaultCwd: process.env.DEFAULT_CWD ? expandHome(process.env.DEFAULT_CWD) : undefined,
-  toolApproval: env("TOOL_APPROVAL", "auto") as "auto" | "interactive",
 } as const;
