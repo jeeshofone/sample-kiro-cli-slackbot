@@ -3,7 +3,6 @@ import App from "@slack/bolt";
 import { config } from "./config.js";
 import { KiroRunner } from "./kiro/runner.js";
 import { loadAgentInfo } from "./kiro/agent-config.js";
-import { runKiroCommand } from "./kiro/command.js";
 import { getSession, setSession } from "./store/session-store.js";
 import { createWorkspaceDir } from "./kiro/workspace.js";
 import { parseProject, listProjects, addProject, removeProject } from "./store/projects.js";
@@ -42,9 +41,6 @@ function extractText(text: string | undefined): string {
 }
 
 // --- Bot commands ---
-// Kiro CLI slash commands — run via `kiro-cli <command>` in the thread's cwd
-const KIRO_CLI_COMMANDS = new Set(["model", "compact", "clear", "help", "agent", "context", "cost"]);
-
 async function handleBotCommand(text: string, channel: string, threadTs: string, client: any): Promise<boolean> {
   const trimmed = text.trim();
 
@@ -75,27 +71,14 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
   }
 
   if (trimmed === "/commands") {
-    const kiroLines = [...KIRO_CLI_COMMANDS].map((c) => `• \`/${c}\``).join("\n");
-    const botLines = ["• `/projects` — list registered projects", "• `/register <name> <path> [agent]` — register a project", "• `/unregister <name>` — remove a project", "• `/commands` — show this list"].join("\n");
-    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n*Kiro CLI commands (run in thread's cwd):*\n${kiroLines}` });
+    const botLines = [
+      "• `/projects` — list registered projects",
+      "• `/register <name> <path> [agent]` — register a project",
+      "• `/unregister <name>` — remove a project",
+      "• `/commands` — show this list",
+    ].join("\n");
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n_All other messages (including /model, /compact, etc.) are sent as prompts to the agent._` });
     return true;
-  }
-
-  // Kiro CLI slash commands — requires an existing session with a cwd
-  if (trimmed.startsWith("/")) {
-    const cmd = trimmed.slice(1).split(/\s/)[0];
-    if (KIRO_CLI_COMMANDS.has(cmd)) {
-      const existing = getSession(channel, threadTs);
-      if (!existing) {
-        await client.chat.postMessage({ channel, thread_ts: threadTs, text: "⚠️ No active session in this thread. Start a conversation first." });
-        return true;
-      }
-      const result = await runKiroCommand(existing.cwd, trimmed.slice(1));
-      const output = (result.stdout || result.stderr || result.error || "No output").trim();
-      const preview = output.length > 3000 ? output.slice(0, 3000) + "\n..." : output;
-      await client.chat.postMessage({ channel, thread_ts: threadTs, text: `\`${trimmed}\`\n\`\`\`\n${preview}\n\`\`\`` });
-      return true;
-    }
   }
 
   return false;

@@ -130,19 +130,7 @@ npm start
 
 ## Kiro CLI Commands
 
-In any thread with an active session, you can run Kiro CLI commands directly:
-
-| Command | Description |
-|---------|-------------|
-| `/model` | Show or change the current model |
-| `/compact` | Compact conversation history |
-| `/clear` | Clear conversation history |
-| `/agent` | Show or change the agent |
-| `/context` | Show context usage |
-| `/cost` | Show token/cost usage |
-| `/help` | Show Kiro CLI help |
-
-These run `kiro-cli <command>` in the thread's working directory and post the output back to Slack.
+Kiro CLI slash commands like `/model`, `/compact`, `/clear`, `/context`, `/cost`, and `/help` are sent as regular prompts to the agent via `kiro-cli chat --resume`. The agent handles them naturally within the conversation.
 
 ## Projects
 
@@ -205,7 +193,6 @@ src/
 ├── kiro/
 │   ├── runner.ts            # Spawns kiro-cli chat, polls SQLite conversation log
 │   ├── conversation.ts      # Reads Kiro's SQLite conversation DB
-│   ├── command.ts           # Runs kiro-cli subcommands (slash commands)
 │   ├── cli-resolver.ts      # Find kiro-cli binary
 │   ├── agent-config.ts      # Read model from agent config
 │   └── workspace.ts         # Per-thread workspace directories
