@@ -1,21 +1,30 @@
-# Kiro Slack Bot
+# Kiro CLI Slack Bot
+
+> Forked from [aws-samples/sample-kiro-assistant](https://github.com/aws-samples/sample-kiro-assistant) — the original Electron desktop app has been replaced with a headless Slack bot using the ACP protocol.
 
 A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) using the **ACP (Agent Client Protocol)** over stdin/stdout. Each Slack thread maps to a persistent Kiro session with its own working directory.
+
+## Features
+
+- **Thread-based sessions** — each Slack thread maps to a persistent Kiro ACP session
+- **Real-time streaming** — responses stream via Slack's native `ChatStreamer` API
+- **Verbose tool output** — file diffs, shell command output, and exit codes shown inline
+- **Interactive tool approval** — Trust (session) / Yes (once) / No buttons, matching Kiro CLI behavior
+- **Auto-approve mode** — skip permission prompts for trusted environments
+- **DM support** — direct message the bot without @mentioning
+- **Access control** — restrict usage to specific Slack user IDs
 
 ## How it works
 
 ```
-@kiro in Slack channel  →  ACP session/new + session/prompt
+@kiro in Slack  →  ACP session/new + session/prompt
   ↓
-Kiro CLI streams AgentMessageChunks  →  Slack chat.startStream/appendStream
+Kiro streams tool_call / agent_message_chunk  →  Slack ChatStreamer
   ↓
-TurnEnd  →  chat.stopStream (message finalized)
+Permission needed?  →  Slack buttons (Trust/Yes/No)  →  ACP response
+  ↓
+TurnEnd  →  stream finalized
 ```
-
-- Thread replies resume the existing ACP session
-- Responses stream in real-time using Slack's native `ChatStreamer` API with `markdown` blocks
-- Tool calls show status indicators (🔧 / ✅) inline
-- Messages are processed serially via a queue to keep costs predictable
 
 ## Prerequisites
 
@@ -115,6 +124,7 @@ npm start
 | `WORKSPACE_ROOT` | No | Base dir for per-thread workspaces (default: `~/Documents/workspace-kiro-slack`) |
 | `DEFAULT_CWD` | No | Default working directory for new sessions |
 | `KIRO_CLI_PATH` | No | Custom path to kiro-cli binary |
+| `TOOL_APPROVAL` | No | `auto` (approve all, default) or `interactive` (Slack buttons) |
 
 ## Deploy with PM2
 
@@ -151,4 +161,4 @@ src/
 
 ## License
 
-MIT — forked from [sample-kiro-assistant](https://github.com/aws-samples/sample-kiro-assistant)
+MIT — forked from [aws-samples/sample-kiro-assistant](https://github.com/aws-samples/sample-kiro-assistant)

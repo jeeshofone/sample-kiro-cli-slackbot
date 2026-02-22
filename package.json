@@ -1,5 +1,5 @@
 {
-  "name": "kiro-slack-bot",
+  "name": "sample-kiro-cli-slackbot",
   "private": true,
   "version": "0.1.0",
   "type": "module",
