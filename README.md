@@ -7,7 +7,7 @@ A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) via `kiro-cli 
 ## Features
 
 - **Thread-based sessions** — each Slack thread maps to a persistent Kiro conversation
-- **Real-time streaming** — responses stream via Slack's native `ChatStreamer` API (polled from Kiro's SQLite conversation log)
+- **Real-time streaming** — stdout parsed and streamed to Slack via `ChatStreamer` as it happens
 - **Verbose tool output** — tool calls and results shown inline
 - **Model display** — shows the model from agent config in the thread header
 - **Kiro CLI commands** — `/model`, `/compact`, `/clear`, `/agent`, `/cost`, `/context`, `/help` run directly via `kiro-cli`
@@ -22,9 +22,11 @@ A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) via `kiro-cli 
 ```
 @kiro in Slack  →  kiro-cli chat --trust-all-tools --agent X --model Y "prompt"
   ↓
-kiro-cli writes to SQLite  →  poll every 750ms  →  Slack ChatStreamer
+stdout streams in real-time  →  Slack ChatStreamer (live updates)
   ↓
-Process exits  →  final sync  →  ✅ reaction
+Tool calls shown as they happen  →  assistant text streams word-by-word
+  ↓
+Process exits  →  ✅ reaction
   ↓
 Follow-up in thread  →  kiro-cli chat --resume "next prompt"
 ```
@@ -196,8 +198,7 @@ src/
 ├── config.ts                # Env var config
 ├── logger.ts                # Pino structured logging
 ├── kiro/
-│   ├── runner.ts            # Spawns kiro-cli chat, polls SQLite conversation log
-│   ├── conversation.ts      # Reads Kiro's SQLite conversation DB
+│   ├── runner.ts            # Spawns kiro-cli chat, streams stdout in real-time
 │   ├── cli-resolver.ts      # Find kiro-cli binary
 │   ├── agent-config.ts      # Read model from agent config
 │   └── workspace.ts         # Per-thread workspace directories

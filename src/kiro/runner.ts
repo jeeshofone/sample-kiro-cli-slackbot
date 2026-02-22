@@ -1,28 +1,28 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { resolveKiroCliBinary, getEnhancedEnv } from "./cli-resolver.js";
-import { loadConversation, type KiroHistoryEntry } from "./conversation.js";
 import { logger } from "../logger.js";
 
-export type RunnerHandle = {
-  abort: () => void;
-};
+export type RunnerHandle = { abort: () => void };
 
 export type RunnerOptions = {
   prompt: string;
   cwd: string;
   agent: string;
   model?: string;
-  resumeSessionId?: string;
+  resume?: boolean;
 };
 
+const ANSI_RE = /[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+// Lines to suppress from the CLI banner
+const BANNER_RE = /^(Picking up|Did you know|Model:|Plan:|All tools are now trusted|Agents can sometimes|Learn more at|WARNING:|understand the risks|╭|│|╰|✓ \d+ of|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|Thinking\.\.\.|▸ Credits)/;
+const MCP_INIT_RE = /^\d+ of \d+ mcp servers|^✓ .+ loaded in|ctrl-c to start/;
+
 /**
- * Spawns `kiro-cli chat` per prompt, polls the SQLite conversation log.
- * Emits: "delta" (text), "done" (conversationId), "error" (message)
+ * Spawns `kiro-cli chat` per prompt, streams stdout in real-time.
+ * Emits: "delta" (text), "tool" (text), "done" (code), "error" (msg)
  */
 export class KiroRunner extends EventEmitter {
-  private historyCursors = new Map<string, number>(); // cwd → cursor
-
   run(opts: RunnerOptions): RunnerHandle {
     const binary = resolveKiroCliBinary();
     if (!binary) {
@@ -30,13 +30,13 @@ export class KiroRunner extends EventEmitter {
       return { abort: () => {} };
     }
 
-    const args = ["chat", "--trust-all-tools", "--wrap", "never", "--no-interactive"];
+    const args = ["chat", "--trust-all-tools", "--wrap", "never"];
     if (opts.model) args.push("--model", opts.model);
     if (opts.agent) args.push("--agent", opts.agent);
-    if (opts.resumeSessionId) args.push("--resume");
+    if (opts.resume) args.push("--resume");
     if (opts.prompt.trim()) args.push(opts.prompt);
 
-    logger.info({ binary, args: args.slice(0, 6), cwd: opts.cwd }, "spawning kiro-cli chat");
+    logger.info({ binary, args: args.join(" ").slice(0, 120), cwd: opts.cwd }, "spawning kiro-cli chat");
 
     const child = spawn(binary, args, {
       cwd: opts.cwd,
@@ -45,11 +45,21 @@ export class KiroRunner extends EventEmitter {
 
     let closed = false;
     let aborted = false;
+    let buf = "";
 
     child.stdout?.on("data", (d: Buffer) => {
-      const t = d.toString().trim();
-      if (t) logger.debug({ src: "kiro-stdout" }, t);
+      buf += d.toString();
+      // Process complete lines + trailing partial
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? ""; // keep incomplete line in buffer
+      for (const raw of lines) this.processLine(raw);
+      // Also process trailing partial if it looks complete (word-by-word streaming)
+      if (buf.trim()) {
+        this.processLine(buf);
+        buf = "";
+      }
     });
+
     child.stderr?.on("data", (d: Buffer) => {
       const t = d.toString().trim();
       if (t) logger.debug({ src: "kiro-stderr" }, t);
@@ -58,50 +68,15 @@ export class KiroRunner extends EventEmitter {
     child.on("error", (err) => {
       if (closed) return;
       closed = true;
-      if (pollTimer) clearInterval(pollTimer);
       this.emit("error", err.message);
     });
-
-    const syncConversation = (throwOnMissing = true): boolean => {
-      const record = loadConversation(opts.cwd);
-      if (!record) {
-        if (throwOnMissing) throw new Error("No conversation history written by kiro-cli");
-        return false;
-      }
-
-      const total = record.history.length;
-      const cursor = Math.min(this.historyCursors.get(opts.cwd) ?? 0, total);
-      const newEntries = record.history.slice(cursor);
-
-      if (newEntries.length === 0) return false;
-
-      for (const entry of newEntries) {
-        this.emitEntry(entry);
-      }
-
-      this.historyCursors.set(opts.cwd, total);
-      return true;
-    };
-
-    let pollTimer: NodeJS.Timeout | null = setInterval(() => {
-      try { syncConversation(false); } catch (e) {
-        logger.warn({ err: e }, "poll sync failed");
-      }
-    }, 750);
 
     child.on("close", (code) => {
       if (closed) return;
       closed = true;
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      try {
-        syncConversation(true);
-        if (!aborted) {
-          const record = loadConversation(opts.cwd);
-          this.emit("done", record?.conversationId ?? null, code);
-        }
-      } catch (err) {
-        this.emit("error", err instanceof Error ? err.message : "Failed to read conversation log");
-      }
+      // Flush remaining buffer
+      if (buf.trim()) this.processLine(buf);
+      if (!aborted) this.emit("done", code);
     });
 
     return {
@@ -113,63 +88,18 @@ export class KiroRunner extends EventEmitter {
     };
   }
 
-  /** Reset cursor for a cwd so next run picks up from current position */
-  snapshotCursor(cwd: string): void {
-    const record = loadConversation(cwd);
-    if (record) this.historyCursors.set(cwd, record.history.length);
-  }
+  private processLine(raw: string): void {
+    const clean = raw.replace(ANSI_RE, "").replace(/\r/g, "");
+    if (!clean.trim()) return;
+    if (BANNER_RE.test(clean.trim())) return;
+    if (MCP_INIT_RE.test(clean.trim())) return;
 
-  private emitEntry(entry: KiroHistoryEntry): void {
-    // Assistant response text
-    const assistant = entry.assistant;
-    if (assistant && typeof assistant === "object") {
-      const response = (assistant as any).Response;
-      if (response?.content) {
-        const text = this.extractText(response.content);
-        if (text) this.emit("delta", text);
-      }
-
-      // Tool use
-      const toolUse = (assistant as any).ToolUse;
-      if (toolUse?.tool_uses && Array.isArray(toolUse.tool_uses)) {
-        for (const tool of toolUse.tool_uses) {
-          const name = tool.name ?? tool.orig_name ?? "tool";
-          this.emit("tool_call", name, tool.args ?? tool.orig_args ?? {});
-        }
-      }
+    if (clean.startsWith("> ")) {
+      // Assistant response text
+      this.emit("delta", clean.slice(2));
+    } else {
+      // Tool output
+      this.emit("tool", clean);
     }
-
-    // Tool results from user content
-    const user = entry.user;
-    if (user && typeof user === "object") {
-      const content = (user as any).content;
-      if (content && typeof content === "object") {
-        const results = content.ToolUseResults?.tool_use_results;
-        if (Array.isArray(results)) {
-          for (const r of results) {
-            const stdout = r.stdout ?? "";
-            const stderr = r.stderr ?? "";
-            const status = r.status ?? "success";
-            this.emit("tool_result", r.tool_use_id, { stdout, stderr, status, content: r.content });
-          }
-        }
-      }
-    }
-  }
-
-  private extractText(content: unknown): string {
-    if (typeof content === "string") return content;
-    if (Array.isArray(content)) {
-      return content
-        .map((c) => {
-          if (typeof c === "string") return c;
-          if (c?.text) return c.text;
-          if (c?.Text) return c.Text;
-          return "";
-        })
-        .join("");
-    }
-    if (content && typeof content === "object" && "text" in content) return (content as any).text;
-    return "";
   }
 }

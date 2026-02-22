@@ -116,14 +116,14 @@ async function handleMessage(
 
     let cwd: string;
     let agent: string;
-    let resumeSessionId: string | undefined;
+    let resume = false;
     let projectName: string | undefined;
 
     if (existing) {
       cwd = existing.cwd;
       agent = existing.agent ?? config.kiroAgent;
-      resumeSessionId = existing.sessionId;
-      logger.info({ cwd, agent, resumeSessionId }, "resuming existing session");
+      resume = true;
+      logger.info({ cwd, agent }, "resuming existing session");
     } else {
       const { project, rest } = parseProject(userText);
       userText = rest || userText;
@@ -150,33 +150,17 @@ async function handleMessage(
       sender.appendDelta(`${header}${modelLine}\n\n`).catch(() => {});
     }
 
-    // Snapshot cursor before running so we only get new entries
-    runner.snapshotCursor(cwd);
-
     // Wire up events for this run
     const onDelta = (text: string) => {
       sender.appendDelta(text).catch((e) => logger.error(e, "stream append failed"));
     };
-    const onToolCall = (name: string, _args: any) => {
-      sender.appendDelta(`\n🔧 _${name}_\n`).catch((e) => logger.error(e, "tool status failed"));
+    const onTool = (text: string) => {
+      sender.appendDelta(`\n\`${text}\`\n`).catch((e) => logger.error(e, "tool output failed"));
     };
-    const onToolResult = (_id: string, result: any) => {
-      const out = (result.stdout ?? "") + (result.stderr ?? "");
-      if (out.trim()) {
-        const preview = out.length > 1000 ? out.slice(0, 1000) + "\n..." : out;
-        sender.appendDelta(`\n\`\`\`\n${preview.trim()}\n\`\`\`\n`).catch(() => {});
-      }
-    };
-    const onDone = (conversationId: string | null, code: number | null) => {
-      logger.info({ cwd, conversationId, code }, "kiro-cli done");
-      // Store the conversation ID as sessionId for --resume
-      if (conversationId || !existing) {
-        setSession(channel, threadTs, {
-          sessionId: conversationId ?? cwd,
-          cwd,
-          agent,
-          createdAt: existing?.createdAt ?? Date.now(),
-        });
+    const onDone = (code: number | null) => {
+      logger.info({ cwd, code }, "kiro-cli done");
+      if (!existing) {
+        setSession(channel, threadTs, { sessionId: cwd, cwd, agent, createdAt: Date.now() });
       }
       sender.finish().catch((e) => logger.error(e, "finish failed"));
       activeSenders.delete(cwd);
@@ -193,25 +177,17 @@ async function handleMessage(
 
     function cleanup() {
       runner.off("delta", onDelta);
-      runner.off("tool_call", onToolCall);
-      runner.off("tool_result", onToolResult);
+      runner.off("tool", onTool);
       runner.off("done", onDone);
       runner.off("error", onError);
     }
 
     runner.on("delta", onDelta);
-    runner.on("tool_call", onToolCall);
-    runner.on("tool_result", onToolResult);
+    runner.on("tool", onTool);
     runner.on("done", onDone);
     runner.on("error", onError);
 
-    runner.run({
-      prompt: userText,
-      cwd,
-      agent,
-      model: agentInfo.model,
-      resumeSessionId,
-    });
+    runner.run({ prompt: userText, cwd, agent, model: agentInfo.model, resume });
   } catch (err) {
     logger.error(err, "handleMessage failed");
     releasePromptLock();
