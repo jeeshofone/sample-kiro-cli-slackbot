@@ -18,6 +18,7 @@ export class SlackSender {
   private streamer: ChatStreamer | null = null;
   private accumulated = "";
   private queue: Promise<void> = Promise.resolve();
+  private lastMessageTs: string | null = null;
 
   constructor(
     private client: WebClient,
@@ -26,6 +27,26 @@ export class SlackSender {
     private recipientTeamId: string,
     private recipientUserId: string,
   ) {}
+
+  private getMessageTs(): string | null {
+    return (this.streamer as any)?.streamTs ?? this.lastMessageTs;
+  }
+
+  private async react(name: string, remove = false): Promise<void> {
+    const ts = this.getMessageTs();
+    if (!ts) return;
+    try {
+      if (remove) {
+        await this.client.reactions.remove({ channel: this.channel, timestamp: ts, name });
+      } else {
+        await this.client.reactions.add({ channel: this.channel, timestamp: ts, name });
+      }
+    } catch {}
+  }
+
+  async markThinking(): Promise<void> { await this.react("hourglass_flowing_sand"); }
+  async clearThinking(): Promise<void> { await this.react("hourglass_flowing_sand", true); }
+  async markDone(): Promise<void> { await this.react("white_check_mark"); }
 
   async appendDelta(delta: string): Promise<void> {
     // Serialize all append operations to avoid race conditions
@@ -39,11 +60,14 @@ export class SlackSender {
     this.accumulated += delta;
 
     if (this.accumulated.length > MAX_STREAM_LEN && this.streamer) {
+      this.lastMessageTs = (this.streamer as any).streamTs ?? null;
       await this.streamer.stop();
+      await this.clearThinking();
       this.streamer = null;
       this.accumulated = delta;
     }
 
+    const isNew = !this.streamer;
     if (!this.streamer) {
       this.streamer = new ChatStreamer(this.client, slackLogger as any, {
         channel: this.channel,
@@ -54,6 +78,11 @@ export class SlackSender {
     }
 
     await this.streamer.append({ markdown_text: delta });
+
+    if (isNew) {
+      // First chunk — add thinking indicator
+      await this.markThinking();
+    }
   }
 
   async toolStatus(toolName: string, status: "running" | "done" | "failed"): Promise<void> {
@@ -62,12 +91,14 @@ export class SlackSender {
   }
 
   async finish(): Promise<void> {
-    // Wait for any pending appends to complete
     await this.queue;
     if (this.streamer) {
+      this.lastMessageTs = (this.streamer as any).streamTs ?? null;
       await this.streamer.stop();
       this.streamer = null;
     }
+    await this.clearThinking();
+    await this.markDone();
   }
 
   async sendError(text: string): Promise<void> {
