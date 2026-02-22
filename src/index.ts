@@ -234,9 +234,10 @@ async function handleMessage(
       cwd = existing.cwd;
       agent = existing.agent;
       const acpClient = await getAcpClient(agent);
+      const mcpServers = agent ? loadAgentMcpServers(agent, cwd) : [];
       logger.info({ sessionId, agent }, "loading existing session");
       try {
-        await acpClient.loadSession(sessionId, cwd);
+        await acpClient.loadSession(sessionId, cwd, mcpServers);
         await new Promise((r) => setTimeout(r, 100));
       } catch (err) {
         logger.warn({ err }, "session/load failed, creating new");
