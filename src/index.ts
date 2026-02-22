@@ -156,6 +156,8 @@ function extractText(text: string | undefined): string {
 }
 
 // --- Bot commands (handled before sending to ACP) ---
+const KIRO_COMMANDS = new Set(["/model", "/context", "/compact", "/clear", "/help", "/agent"]);
+
 async function handleBotCommand(text: string, channel: string, threadTs: string, client: any): Promise<boolean> {
   const trimmed = text.trim();
 
@@ -185,7 +187,20 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
     return true;
   }
 
+  if (trimmed === "/commands") {
+    const kiroLines = [...KIRO_COMMANDS].map((c) => `• \`${c}\``).join("\n");
+    const botLines = ["• `/projects` — list registered projects", "• `/register <name> <path> [agent]` — register a project", "• `/unregister <name>` — remove a project", "• `/commands` — show this list"].join("\n");
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n*Kiro commands (forwarded to agent):*\n${kiroLines}` });
+    return true;
+  }
+
   return false;
+}
+
+// Check if text is a Kiro slash command (forwarded as prompt to ACP)
+function isKiroCommand(text: string): boolean {
+  const cmd = text.trim().split(/\s/)[0];
+  return KIRO_COMMANDS.has(cmd);
 }
 
 // --- Handle a message (shared by app_mention and DM) ---
