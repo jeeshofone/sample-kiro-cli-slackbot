@@ -75,9 +75,20 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
       "• `/projects` — list registered projects",
       "• `/register <name> <path> [agent]` — register a project",
       "• `/unregister <name>` — remove a project",
+      "• `/model` — show current model",
       "• `/commands` — show this list",
     ].join("\n");
-    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n_All other messages (including /model, /compact, etc.) are sent as prompts to the agent._` });
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n_All other messages are sent as prompts to the agent. Auto-compaction runs when context overflows._` });
+    return true;
+  }
+
+  if (trimmed === "/model") {
+    const existing = getSession(channel, threadTs);
+    const agent = existing?.agent ?? config.kiroAgent;
+    const cwd = existing?.cwd;
+    const info = loadAgentInfo(agent, cwd);
+    const model = info.model ?? "default (not set in agent config)";
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `🤖 *Model:* \`${model}\`\n*Agent:* \`${agent}\`${cwd ? `\n*CWD:* \`${cwd}\`` : ""}` });
     return true;
   }
 

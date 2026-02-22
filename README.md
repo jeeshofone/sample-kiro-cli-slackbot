@@ -130,7 +130,12 @@ npm start
 
 ## Kiro CLI Commands
 
-Kiro CLI slash commands like `/model`, `/compact`, `/clear`, `/context`, `/cost`, and `/help` are sent as regular prompts to the agent via `kiro-cli chat --resume`. The agent handles them naturally within the conversation.
+Kiro CLI slash commands like `/compact`, `/clear`, `/context`, `/cost`, and `/help` are interactive-only features that only work inside a live `kiro-cli chat` session. They cannot be invoked externally.
+
+What works instead:
+- `/model` — bot command that shows the model from the agent config
+- **Auto-compaction** — Kiro CLI automatically compacts when context overflows, so long threads are handled
+- Start a **new thread** if you want a fresh context
 
 ## Projects
 
