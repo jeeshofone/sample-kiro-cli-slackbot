@@ -6,6 +6,7 @@ import type { SessionUpdate } from "./acp/types.js";
 import { getSession, setSession } from "./store/session-store.js";
 import { createWorkspaceDir } from "./kiro/workspace.js";
 import { parseProject, listProjects, addProject, removeProject } from "./store/projects.js";
+import { loadAgentMcpServers } from "./kiro/agent-config.js";
 import { SlackSender } from "./slack/message-sender.js";
 import { logger } from "./logger.js";
 
@@ -263,7 +264,8 @@ async function handleMessage(
       }
 
       const acpClient = await getAcpClient(agent);
-      const info = await acpClient.createSession(cwd);
+      const mcpServers = agent ? loadAgentMcpServers(agent, project?.cwd) : [];
+      const info = await acpClient.createSession(cwd, mcpServers);
       sessionId = info.sessionId;
       logger.info({ sessionId, cwd, agent }, "created new session");
       setSession(channel, threadTs, { sessionId, cwd, agent, createdAt: Date.now() });

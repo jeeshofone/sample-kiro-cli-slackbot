@@ -61,8 +61,8 @@ export class AcpClient extends EventEmitter {
     await this.initialize();
   }
 
-  async createSession(cwd: string): Promise<AcpSessionInfo> {
-    const result = (await this.request("session/new", { cwd, mcpServers: [] })) as { sessionId: string };
+  async createSession(cwd: string, mcpServers: any[] = []): Promise<AcpSessionInfo> {
+    const result = (await this.request("session/new", { cwd, mcpServers })) as { sessionId: string };
     return { sessionId: result.sessionId, cwd };
   }
 
