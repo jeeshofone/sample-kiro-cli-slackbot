@@ -95,6 +95,60 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
   return false;
 }
 
+// --- Format tool output blocks for Slack ---
+function formatToolBlock(lines: string[]): string {
+  const parts: string[] = [];
+  let diffLines: string[] = [];
+  let cmdOutput: string[] = [];
+
+  const flushDiff = () => {
+    if (!diffLines.length) return;
+    // Strip the "+    N: " prefix for cleaner display
+    const code = diffLines.map((l) => l.replace(/^[+-]\s*\d+:\s?/, "")).join("\n");
+    parts.push("```\n" + code + "\n```");
+    diffLines = [];
+  };
+
+  const flushCmd = () => {
+    if (!cmdOutput.length) return;
+    parts.push("```\n" + cmdOutput.join("\n") + "\n```");
+    cmdOutput = [];
+  };
+
+  for (const line of lines) {
+    // Diff lines: +    1: code  or -    1: code
+    if (/^[+-]\s+\d+:/.test(line)) {
+      flushCmd();
+      diffLines.push(line);
+      continue;
+    }
+
+    flushDiff();
+
+    // Tool header: "I'll create..." / "I will run..." / "Reading directory..."
+    if (/^I'll |^I will |^Reading |^Purpose:/.test(line)) {
+      flushCmd();
+      parts.push(`\n🔧 _${line}_`);
+      continue;
+    }
+
+    // Completion: "Creating: ..." / "Appending to: ..." / "- Completed in ..."
+    if (/^Creating:|^Appending to:|^- Completed in|^✓ /.test(line)) {
+      flushCmd();
+      parts.push(`_${line}_`);
+      continue;
+    }
+
+    // Everything else is command output
+    cmdOutput.push(line);
+  }
+
+  flushDiff();
+  flushCmd();
+
+  return "\n" + parts.join("\n") + "\n";
+}
+
 // --- Handle a message ---
 async function handleMessage(
   channel: string,
@@ -154,8 +208,9 @@ async function handleMessage(
     const onDelta = (text: string) => {
       sender.appendDelta(text).catch((e) => logger.error(e, "stream append failed"));
     };
-    const onTool = (text: string) => {
-      sender.appendDelta(`\n\`${text}\`\n`).catch((e) => logger.error(e, "tool output failed"));
+    const onTool = (lines: string[]) => {
+      const formatted = formatToolBlock(lines);
+      sender.appendDelta(formatted).catch((e) => logger.error(e, "tool output failed"));
     };
     const onDone = (code: number | null) => {
       logger.info({ cwd, code }, "kiro-cli done");

@@ -6,30 +6,32 @@ A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) via `kiro-cli 
 
 ## Features
 
-- **Thread-based sessions** — each Slack thread maps to a persistent Kiro conversation
-- **Real-time streaming** — stdout parsed and streamed to Slack via `ChatStreamer` as it happens
-- **Verbose tool output** — tool calls and results shown inline
+- **Real-time streaming** — `kiro-cli chat` stdout is parsed and streamed to Slack as it happens
+- **Formatted tool output** — file diffs in code blocks, shell output in code blocks, tool headers with 🔧
+- **Thread-based sessions** — each Slack thread maps to a persistent Kiro conversation via `--resume`
 - **Model display** — shows the model from agent config in the thread header
-- **Kiro CLI commands** — `/model`, `/compact`, `/clear`, `/agent`, `/cost`, `/context`, `/help` run directly via `kiro-cli`
 - **Per-project support** — different agents, models, and working directories per Slack thread
 - **DM support** — direct message the bot without @mentioning
 - **Access control** — restrict usage to specific Slack user IDs
-- **`--resume` for follow-ups** — follow-up messages in a thread resume the existing conversation
+- **Visual indicators** — ⏳ while streaming, ✅ when done
 - **`--trust-all-tools`** — no permission prompts, matching the original project's approach
+- **Auto-compaction** — Kiro CLI automatically compacts when context overflows
 
 ## How it works
 
 ```
-@kiro in Slack  →  kiro-cli chat --trust-all-tools --agent X --model Y "prompt"
+@kiro in Slack  →  kiro-cli chat --trust-all-tools --no-interactive --agent X --model Y "prompt"
   ↓
-stdout streams in real-time  →  Slack ChatStreamer (live updates)
+stdout streams in real-time  →  parse ANSI, detect tool output vs assistant text
   ↓
-Tool calls shown as they happen  →  assistant text streams word-by-word
+Tool calls: 🔧 header + code blocks  →  assistant text: buffered word-by-word
   ↓
 Process exits  →  ✅ reaction
   ↓
-Follow-up in thread  →  kiro-cli chat --resume "next prompt"
+Follow-up in thread  →  kiro-cli chat --resume "next prompt" (same cwd)
 ```
+
+Each message spawns a new `kiro-cli chat` process. Threads share state via the conversation history on disk (keyed by working directory), not via persistent processes.
 
 ## Prerequisites
 
@@ -130,6 +132,16 @@ npm start
 | `DEFAULT_CWD` | No | Default working directory for new sessions |
 | `KIRO_CLI_PATH` | No | Custom path to kiro-cli binary |
 
+## Bot Commands
+
+| Command | Description |
+|---------|-------------|
+| `/model` | Show current model, agent, and working directory |
+| `/projects` | List registered projects |
+| `/register <name> <path> [agent]` | Register a project |
+| `/unregister <name>` | Remove a project |
+| `/commands` | Show all available commands |
+
 ## Kiro CLI Commands
 
 Kiro CLI slash commands like `/compact`, `/clear`, `/context`, `/cost`, and `/help` are interactive-only features that only work inside a live `kiro-cli chat` session. They cannot be invoked externally.
@@ -194,11 +206,12 @@ pm2 save
 
 ```
 src/
-├── index.ts                 # Bolt app, event handlers, serial queue
+├── index.ts                 # Bolt app, event handlers, serial queue, tool formatting
 ├── config.ts                # Env var config
 ├── logger.ts                # Pino structured logging
 ├── kiro/
-│   ├── runner.ts            # Spawns kiro-cli chat, streams stdout in real-time
+│   ├── runner.ts            # Spawns kiro-cli chat, streams/parses stdout in real-time
+│   ├── command.ts           # Runs kiro-cli subcommands
 │   ├── cli-resolver.ts      # Find kiro-cli binary
 │   ├── agent-config.ts      # Read model from agent config
 │   └── workspace.ts         # Per-thread workspace directories
