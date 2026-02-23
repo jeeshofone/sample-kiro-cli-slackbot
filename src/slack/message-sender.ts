@@ -77,10 +77,27 @@ export class SlackSender {
       }, {});
     }
 
-    await this.streamer.append({ markdown_text: delta });
+    try {
+      await this.streamer.append({ markdown_text: delta });
+    } catch (e: any) {
+      if (e?.data?.error === "message_not_in_streaming_state") {
+        // Stream timed out — start a new message
+        this.lastMessageTs = (this.streamer as any).streamTs ?? null;
+        this.streamer = null;
+        this.accumulated = delta;
+        this.streamer = new ChatStreamer(this.client, slackLogger as any, {
+          channel: this.channel,
+          thread_ts: this.threadTs,
+          recipient_team_id: this.recipientTeamId,
+          recipient_user_id: this.recipientUserId,
+        }, {});
+        await this.streamer.append({ markdown_text: delta });
+      } else {
+        throw e;
+      }
+    }
 
     if (isNew) {
-      // First chunk — add thinking indicator
       await this.markThinking();
     }
   }
