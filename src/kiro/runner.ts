@@ -17,6 +17,9 @@ const ANSI_RE = /[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-n
 const BANNER_RE = /^(Picking up|Did you know|Model:|Plan:|All tools are now trusted|Agents can sometimes|Learn more at|WARNING:|understand the risks|╭|│|╰|✓ \d+ of|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|Thinking\.\.\.|▸ Credits)/;
 const MCP_INIT_RE = /^\d+ of \d+ mcp servers|^✓ .+ loaded in|ctrl-c to start/;
 
+// Tool output patterns — lines that indicate tool activity (not assistant text)
+const TOOL_RE = /^(I'll |I will |Reading directory:|Purpose:|Creating:|Appending to:|- Completed in|✓ Successfully|[+-]\s+\d+:)/;
+
 function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "").replace(/\r/g, "");
 }
@@ -30,6 +33,10 @@ function isBanner(line: string): boolean {
 /**
  * Spawns `kiro-cli chat --no-interactive` per prompt, streams stdout in real-time.
  * Emits: "delta" (text), "tool" (lines[]), "done" (code), "error" (msg)
+ *
+ * The CLI prefixes the first line of assistant text with "> ".
+ * Continuation lines have no prefix. Tool output matches TOOL_RE patterns.
+ * We track mode (assistant vs tool) to correctly classify continuation lines.
  */
 export class KiroRunner extends EventEmitter {
   run(opts: RunnerOptions): RunnerHandle {
@@ -57,6 +64,7 @@ export class KiroRunner extends EventEmitter {
     let raw = "";
     let pendingText = "";
     let pendingTool: string[] = [];
+    let inAssistant = false;  // are we in assistant text mode?
     let textTimer: NodeJS.Timeout | null = null;
     let toolTimer: NodeJS.Timeout | null = null;
 
@@ -86,6 +94,13 @@ export class KiroRunner extends EventEmitter {
       toolTimer = setTimeout(flushTool, 200);
     };
 
+    const classifyLine = (clean: string): "assistant" | "tool" => {
+      if (clean.startsWith("> ")) return "assistant";
+      if (TOOL_RE.test(clean)) return "tool";
+      // Continuation: stay in current mode
+      return inAssistant ? "assistant" : "tool";
+    };
+
     const processLines = () => {
       const idx = raw.lastIndexOf("\n");
       if (idx === -1) return;
@@ -94,14 +109,23 @@ export class KiroRunner extends EventEmitter {
 
       for (const line of complete.split("\n")) {
         const clean = stripAnsi(line);
-        if (!clean.trim() || isBanner(clean)) continue;
+        if (!clean.trim() && !inAssistant) {
+          if (isBanner(clean)) continue;
+          continue;
+        }
+        if (isBanner(clean)) continue;
 
-        if (clean.startsWith("> ")) {
+        const kind = classifyLine(clean);
+
+        if (kind === "assistant") {
           flushTool();
-          pendingText += clean.slice(2) + "\n";
+          inAssistant = true;
+          const text = clean.startsWith("> ") ? clean.slice(2) : clean;
+          pendingText += text + "\n";
           scheduleTextFlush();
         } else {
           flushText();
+          inAssistant = false;
           pendingTool.push(clean);
           scheduleToolFlush();
         }
@@ -116,18 +140,17 @@ export class KiroRunner extends EventEmitter {
 
       if (clean.startsWith("> ")) {
         flushTool();
+        inAssistant = true;
         pendingText += clean.slice(2);
-      } else {
-        // Word-by-word assistant text (no > prefix on continuation)
-        // If we're in tool mode, this is tool text; otherwise assistant
-        if (pendingTool.length) {
-          pendingTool.push(clean);
-          scheduleToolFlush();
-        } else {
-          pendingText += clean;
-        }
+        scheduleTextFlush();
+      } else if (inAssistant) {
+        // Continuation of assistant text (word-by-word)
+        pendingText += clean;
+        scheduleTextFlush();
+      } else if (clean.trim()) {
+        pendingTool.push(clean);
+        scheduleToolFlush();
       }
-      scheduleTextFlush();
     };
 
     child.stdout?.on("data", (d: Buffer) => {
@@ -155,7 +178,9 @@ export class KiroRunner extends EventEmitter {
       if (raw) {
         const clean = stripAnsi(raw);
         if (!isBanner(clean)) {
-          pendingText += clean.startsWith("> ") ? clean.slice(2) : clean;
+          if (clean.startsWith("> ")) pendingText += clean.slice(2);
+          else if (inAssistant) pendingText += clean;
+          else pendingTool.push(clean);
         }
         raw = "";
       }
