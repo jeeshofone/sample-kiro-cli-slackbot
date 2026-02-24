@@ -2,7 +2,7 @@ import "dotenv/config";
 import App from "@slack/bolt";
 import { config } from "./config.js";
 import { KiroRunner } from "./kiro/runner.js";
-import { loadAgentInfo } from "./kiro/agent-config.js";
+import { loadAgentInfo, listAgents } from "./kiro/agent-config.js";
 import { getSession, setSession } from "./store/session-store.js";
 import { createWorkspaceDir } from "./kiro/workspace.js";
 import { parseProject, listProjects, addProject, removeProject } from "./store/projects.js";
@@ -78,36 +78,73 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
       "• `/help` — show this help",
       "• `/model` — show current model, agent, and working directory",
       "• `/projects` — list registered projects",
-      "• `/register <name> <path> [agent]` — register a project with a working directory and optional agent",
+      "• `/agents` — list available agents (global + per-project)",
+      "• `/register <name> <path> [agent]` — register a project",
       "• `/unregister <name>` — remove a registered project",
       "",
       "*━━━ How to Use ━━━*",
       "• *Start a conversation:* `@kiro tell me about this codebase`",
-      "• *Use a project:* `@kiro [sirius] monitor the deploy` — runs in that project's directory with its agent",
-      "• *Follow up:* just reply in the same thread — the bot resumes the conversation with full context",
+      "• *Use a project:* `@kiro [sirius] monitor the deploy`",
+      "• *Follow up:* reply in the same thread (uses `--resume` for full context)",
       "• *Fresh start:* start a new thread to reset context",
       "",
-      "*━━━ Projects ━━━*",
-      "Projects let you point the bot at a specific codebase. Each project has:",
-      "• A *name* — what you type in `[brackets]`",
-      "• A *working directory* — where kiro-cli runs (has access to those files)",
-      "• An *agent* — which Kiro agent to use (defines model, MCP servers, instructions)",
+      "*━━━ Setting Up a Project ━━━*",
+      "A project connects the bot to a codebase. You need:",
+      "1️⃣ An *agent config* — defines model, tools, and behavior",
+      "2️⃣ A *registered project* — maps a name to a directory + agent",
       "",
-      "Register via Slack: `@kiro /register myapp /path/to/myapp myagent`",
-      "Or add to `projects.json` in the bot's repo root.",
+      "*Step 1 — Create an agent:*",
+      "Add a JSON file to `~/.kiro/agents/` (global) or `<repo>/.kiro/agents/` (project-local):",
+      "```{",
+      '  "name": "myagent",',
+      '  "description": "Agent for my project",',
+      '  "model": "claude-sonnet-4-20250514",',
+      '  "tools": ["code", "execute_bash", "fs_read", "fs_write", "glob", "grep"],',
+      '  "allowedTools": ["@awslabs.aws-documentation-mcp-server/*"]',
+      "}```",
+      "Save as `myagent.json`. Run `/agents` to verify it's detected.",
+      "",
+      "*Step 2 — Register the project:*",
+      "```@kiro /register myapp /Users/you/code/myapp myagent```",
+      "",
+      "*Step 3 — Use it:*",
+      "```@kiro [myapp] what does this codebase do?```",
+      "",
+      "*━━━ Agent Config Fields ━━━*",
+      "• `name` — agent identifier",
+      "• `description` — what this agent is for",
+      "• `model` — LLM model (e.g. `claude-sonnet-4-20250514`, `claude-opus-4.6`)",
+      "• `tools` — built-in tools: `code`, `execute_bash`, `fs_read`, `fs_write`, `glob`, `grep`, `use_aws`, `web_fetch`, `web_search`",
+      "• `allowedTools` — MCP server tools to auto-approve (e.g. `@puppeteer/*`)",
+      "• `includeMcpJson` — `true` to load MCP servers from `~/.kiro/settings/mcp.json`",
+      "• `systemPrompt` — custom system instructions for the agent",
       "",
       "*━━━ Indicators ━━━*",
-      "• ⏳ — bot is thinking / streaming",
-      "• ✅ — response complete",
-      "• 🔧 — tool call (file edit, shell command, search, etc.)",
+      "• ⏳ streaming  • ✅ done  • 🔧 tool call",
       "",
       "*━━━ Good to Know ━━━*",
-      "• The bot uses `--trust-all-tools` — all tool calls are auto-approved",
-      "• Auto-compaction kicks in when context gets too long",
-      "• One prompt runs at a time across all threads (serial queue)",
-      "• Long-running commands (like deploy monitors) stream in real-time",
+      "• `--trust-all-tools` — all tool calls auto-approved",
+      "• Auto-compaction when context gets too long",
+      "• One prompt at a time (serial queue)",
+      "• Long-running commands stream in real-time",
     ].join("\n");
     await client.chat.postMessage({ channel, thread_ts: threadTs, text: lines });
+    return true;
+  }
+
+  if (trimmed === "/agents") {
+    const projectCwds = listProjects().map((p: any) => p.cwd);
+    const agents = listAgents(projectCwds);
+    if (!agents.length) {
+      await client.chat.postMessage({ channel, thread_ts: threadTs, text: "No agents found. Add JSON configs to `~/.kiro/agents/` or `<project>/.kiro/agents/`. Run `/help` for setup guide." });
+    } else {
+      const lines = agents.map((a) => {
+        const model = a.model ? ` · model: \`${a.model}\`` : "";
+        const desc = a.description ? ` — ${a.description}` : "";
+        return `• \`${a.name}\`${desc}${model}\n  _source: ${a.source}_`;
+      });
+      await client.chat.postMessage({ channel, thread_ts: threadTs, text: `🤖 *Available Agents:*\n\n${lines.join("\n\n")}\n\n_Agents are loaded from \`~/.kiro/agents/\` and project \`.kiro/agents/\` directories._` });
+    }
     return true;
   }
 
