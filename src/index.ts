@@ -337,16 +337,35 @@ app.event("app_mention", async ({ event, client, context }) => {
 });
 
 app.event("message", async ({ event, client, context }) => {
-  if ((event as any).channel_type !== "im") return;
-  if ((event as any).subtype) return;
   const ev = event as any;
+  if (ev.subtype) return;
   const userId = ev.user as string;
   if (!userId) return;
+  // Ignore bot's own messages
+  if (userId === context.botUserId) return;
   if (config.allowedUserIds.length > 0 && !config.allowedUserIds.includes(userId)) return;
+
+  const channel = ev.channel as string;
+  const isDm = ev.channel_type === "im";
+  const isThreadReply = !!ev.thread_ts && ev.thread_ts !== ev.ts;
+
+  // Thread auto-reply: respond to replies in threads with an existing session
+  if (!isDm && isThreadReply) {
+    const session = getSession(channel, ev.thread_ts);
+    if (!session) return; // not a bot thread
+    const userText = extractText(ev.text);
+    if (!userText) return;
+    const teamId = context.teamId ?? ev.team ?? "";
+    await client.reactions.add({ channel, timestamp: ev.ts, name: "eyes" }).catch(() => {});
+    handleMessage(channel, ev.thread_ts, userText, teamId, userId, client);
+    return;
+  }
+
+  // DM handling
+  if (!isDm) return;
   const userText = extractText(ev.text);
   if (!userText) return;
   const threadTs = ev.thread_ts ?? ev.ts;
-  const channel = ev.channel as string;
   const teamId = context.teamId ?? ev.team ?? "";
   await client.reactions.add({ channel, timestamp: ev.ts, name: "eyes" }).catch(() => {});
   handleMessage(channel, threadTs, userText, teamId, userId, client);

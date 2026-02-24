@@ -9,18 +9,20 @@ A Slack bot that proxies messages to [Kiro CLI](https://kiro.dev) via `kiro-cli 
 - **Real-time streaming** — `kiro-cli chat` stdout is parsed and streamed to Slack as it happens
 - **Formatted tool output** — file diffs in code blocks, shell output in code blocks, tool headers with 🔧
 - **Thread-based sessions** — each Slack thread maps to a persistent Kiro conversation via `--resume`
-- **Model display** — shows the model from agent config in the thread header
+- **Thread auto-reply** — reply in a thread without @mentioning the bot to continue the conversation
 - **Per-project support** — different agents, models, and working directories per Slack thread
+- **Agent discovery** — `/agents` lists all available agents from global and project directories
 - **DM support** — direct message the bot without @mentioning
 - **Access control** — restrict usage to specific Slack user IDs
 - **Visual indicators** — ⏳ while streaming, ✅ when done
 - **`--trust-all-tools`** — no permission prompts, matching the original project's approach
 - **Auto-compaction** — Kiro CLI automatically compacts when context overflows
+- **Stream timeout recovery** — long-running commands (10+ min) recover from Slack stream timeouts
 
 ## How it works
 
 ```
-@kiro in Slack  →  kiro-cli chat --trust-all-tools --no-interactive --agent X --model Y "prompt"
+@kiro in Slack  →  kiro-cli chat --trust-all-tools --no-interactive --agent X --model Y -- "prompt"
   ↓
 stdout streams in real-time  →  parse ANSI, detect tool output vs assistant text
   ↓
@@ -28,7 +30,7 @@ Tool calls: 🔧 header + code blocks  →  assistant text: buffered word-by-wor
   ↓
 Process exits  →  ✅ reaction
   ↓
-Follow-up in thread  →  kiro-cli chat --resume "next prompt" (same cwd)
+Follow-up in thread  →  kiro-cli chat --resume -- "next prompt" (same cwd)
 ```
 
 Each message spawns a new `kiro-cli chat` process. Threads share state via the conversation history on disk (keyed by working directory), not via persistent processes.
@@ -84,6 +86,7 @@ Socket Mode lets the bot connect via outbound WebSocket — no public URL needed
 3. Expand **Subscribe to bot events**
 4. Click **Add Bot User Event** and add:
    - `app_mention` — triggers when someone @mentions the bot in a channel
+   - `message.channels` — triggers on all messages in channels the bot is in (for thread auto-reply)
    - `message.im` — triggers on direct messages to the bot
 5. Click **Save Changes** at the bottom
 
@@ -136,35 +139,58 @@ npm start
 
 | Command | Description |
 |---------|-------------|
+| `/help` | Show help with setup guide and examples |
 | `/model` | Show current model, agent, and working directory |
+| `/agents` | List available agents (global + per-project) |
 | `/projects` | List registered projects |
 | `/register <name> <path> [agent]` | Register a project |
 | `/unregister <name>` | Remove a project |
-| `/commands` | Show all available commands |
 
-## Kiro CLI Commands
+## Agents
 
-Kiro CLI slash commands like `/compact`, `/clear`, `/context`, `/cost`, and `/help` are interactive-only features that only work inside a live `kiro-cli chat` session. They cannot be invoked externally.
+Agents are JSON configs that define the model, tools, and behavior. They live in:
+- **Global:** `~/.kiro/agents/<name>.json`
+- **Per-project:** `<repo>/.kiro/agents/<name>.json`
 
-What works instead:
-- `/model` — bot command that shows the model from the agent config
-- **Auto-compaction** — Kiro CLI automatically compacts when context overflows, so long threads are handled
-- Start a **new thread** if you want a fresh context
+Example agent config (`~/.kiro/agents/myagent.json`):
+
+```json
+{
+  "name": "myagent",
+  "description": "Agent for my project",
+  "model": "claude-sonnet-4-20250514",
+  "tools": ["code", "execute_bash", "fs_read", "fs_write", "glob", "grep"],
+  "allowedTools": ["@awslabs.aws-documentation-mcp-server/*"],
+  "includeMcpJson": true
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `name` | Agent identifier |
+| `description` | What this agent is for |
+| `model` | LLM model (e.g. `claude-sonnet-4-20250514`, `claude-opus-4.6`) |
+| `tools` | Built-in tools to enable |
+| `allowedTools` | MCP server tools to auto-approve |
+| `includeMcpJson` | Load MCP servers from `~/.kiro/settings/mcp.json` |
+| `systemPrompt` | Custom system instructions |
+
+Run `/agents` in Slack to see all discovered agents.
 
 ## Projects
 
-Projects let you point the bot at a specific codebase and agent. Start a thread with `[project-name]` to use one:
+Projects connect the bot to a specific codebase. Start a thread with `[project-name]` to use one:
 
 ```
-@kiro-bot [sirius] what's the deployment status?
+@kiro [sirius] what's the deployment status?
 ```
 
 ### Register via Slack
 
 ```
-@kiro-bot /projects                              # list registered projects
-@kiro-bot /register myapp /path/to/myapp myagent # register a project
-@kiro-bot /unregister myapp                      # remove a project
+@kiro /register sirius /Users/you/code/sirius findsirius
+@kiro /projects
+@kiro /unregister sirius
 ```
 
 ### Register via file
@@ -188,6 +214,10 @@ Each project needs:
 
 Threads without a `[project]` prefix use a temporary workspace and the default agent.
 
+## Thread Auto-Reply
+
+Once a thread is started with `@kiro`, you can reply without @mentioning — the bot picks up all messages in threads it's part of. Requires `message.channels` event subscription (see Slack App Setup step 4).
+
 ## Deploy with PM2
 
 ```bash
@@ -202,6 +232,14 @@ pm2 save
 - Set `ALLOWED_USER_IDS` to restrict who can interact with the bot
 - Consider running as a dedicated macOS user with limited filesystem permissions
 
+## TODO
+
+- [ ] Cancel with ❌ — react with ❌ on a streaming message to kill the running process
+- [ ] `/status` — show if a prompt is running, which thread, how long
+- [ ] `/cancel` — text-based kill of the current running process
+- [ ] Per-thread prompt locks — allow parallel threads instead of global serial queue
+- [ ] Thread header — show project, agent, model, cwd when starting a `[project]` thread
+
 ## Architecture
 
 ```
@@ -213,10 +251,10 @@ src/
 │   ├── runner.ts            # Spawns kiro-cli chat, streams/parses stdout in real-time
 │   ├── command.ts           # Runs kiro-cli subcommands
 │   ├── cli-resolver.ts      # Find kiro-cli binary
-│   ├── agent-config.ts      # Read model from agent config
+│   ├── agent-config.ts      # Read model + list agents from agent configs
 │   └── workspace.ts         # Per-thread workspace directories
 ├── slack/
-│   └── message-sender.ts    # ChatStreamer wrapper with overflow handling
+│   └── message-sender.ts    # ChatStreamer wrapper with overflow and timeout recovery
 └── store/
     ├── session-store.ts     # Thread→session mapping (JSON file)
     └── projects.ts          # Project registry
