@@ -72,7 +72,8 @@ Socket Mode lets the bot connect via outbound WebSocket — no public URL needed
 |-------|-----|
 | `app_mentions:read` | Receive @mention events |
 | `chat:write` | Post and stream messages |
-| `channels:history` | Read channel messages (for thread context) |
+| `channels:history` | Read public channel messages (for thread auto-reply) |
+| `groups:history` | Read private channel messages (for thread auto-reply) |
 | `channels:read` | List channels the bot is in |
 | `im:history` | Read DM messages |
 | `im:write` | Send DMs |
@@ -86,7 +87,8 @@ Socket Mode lets the bot connect via outbound WebSocket — no public URL needed
 3. Expand **Subscribe to bot events**
 4. Click **Add Bot User Event** and add:
    - `app_mention` — triggers when someone @mentions the bot in a channel
-   - `message.channels` — triggers on all messages in channels the bot is in (for thread auto-reply)
+   - `message.channels` — triggers on messages in public channels (for thread auto-reply)
+   - `message.groups` — triggers on messages in private channels (for thread auto-reply)
    - `message.im` — triggers on direct messages to the bot
 5. Click **Save Changes** at the bottom
 
@@ -216,7 +218,7 @@ Threads without a `[project]` prefix use a temporary workspace and the default a
 
 ## Thread Auto-Reply
 
-Once a thread is started with `@kiro`, you can reply without @mentioning — the bot picks up all messages in threads it's part of. Requires `message.channels` event subscription (see Slack App Setup step 4).
+Once a thread is started with `@kiro`, you can reply without @mentioning — the bot picks up all messages in threads it's part of. Requires `message.channels` and `message.groups` event subscriptions (see Slack App Setup step 4). `message.channels` covers public channels, `message.groups` covers private channels.
 
 ## Deploy with PM2
 

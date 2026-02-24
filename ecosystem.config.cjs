@@ -6,7 +6,8 @@ module.exports = {
     max_memory_restart: "512M",
     min_uptime: "5s",
     env: {
-      NODE_ENV: "production"
+      NODE_ENV: "production",
+      LOG_LEVEL: "debug"
     }
   }]
 };

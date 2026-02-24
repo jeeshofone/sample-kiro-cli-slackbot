@@ -320,6 +320,17 @@ const app = new BoltApp({
   token: config.slackBotToken,
   appToken: config.slackAppToken,
   socketMode: true,
+  // Needed to receive message.channels events that don't match other listeners
+  ignoreSelf: true,
+});
+
+// Debug: log all incoming events
+app.use(async ({ body, next }) => {
+  const b = body as any;
+  if (b.event) {
+    logger.info({ type: b.event.type, subtype: b.event.subtype, channel_type: b.event.channel_type, thread_ts: b.event.thread_ts, user: b.event.user, text: b.event.text?.slice(0, 50) }, "raw event");
+  }
+  await next();
 });
 
 app.event("app_mention", async ({ event, client, context }) => {
@@ -338,6 +349,7 @@ app.event("app_mention", async ({ event, client, context }) => {
 
 app.event("message", async ({ event, client, context }) => {
   const ev = event as any;
+  logger.debug({ channel_type: ev.channel_type, subtype: ev.subtype, thread_ts: ev.thread_ts, ts: ev.ts, user: ev.user, botUserId: context.botUserId, text: ev.text?.slice(0, 50) }, "message event received");
   if (ev.subtype) return;
   const userId = ev.user as string;
   if (!userId) return;
