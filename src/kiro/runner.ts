@@ -50,7 +50,7 @@ export class KiroRunner extends EventEmitter {
     if (opts.model) args.push("--model", opts.model);
     if (opts.agent) args.push("--agent", opts.agent);
     if (opts.resume) args.push("--resume");
-    if (opts.prompt.trim()) args.push(opts.prompt);
+    if (opts.prompt.trim()) { args.push("--"); args.push(opts.prompt); }
 
     logger.info({ binary, args: args.join(" ").slice(0, 120), cwd: opts.cwd }, "spawning kiro-cli chat");
 
