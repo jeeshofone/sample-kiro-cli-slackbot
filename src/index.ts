@@ -70,15 +70,24 @@ async function handleBotCommand(text: string, channel: string, threadTs: string,
     return true;
   }
 
-  if (trimmed === "/commands") {
-    const botLines = [
+  if (trimmed === "/commands" || trimmed === "/help") {
+    const lines = [
+      "*Commands:*",
+      "• `/help` — show this help",
+      "• `/model` — show current model, agent, and working directory",
       "• `/projects` — list registered projects",
       "• `/register <name> <path> [agent]` — register a project",
       "• `/unregister <name>` — remove a project",
-      "• `/model` — show current model",
-      "• `/commands` — show this list",
+      "",
+      "*Usage:*",
+      "• `@kiro <message>` — send a prompt to the agent",
+      "• `@kiro [project] <message>` — use a specific project's cwd and agent",
+      "• Reply in a thread to continue the conversation (uses `--resume`)",
+      "• ⏳ = streaming, ✅ = done",
+      "",
+      "_Auto-compaction runs when context overflows. Start a new thread for fresh context._",
     ].join("\n");
-    await client.chat.postMessage({ channel, thread_ts: threadTs, text: `*Bot commands:*\n${botLines}\n\n_All other messages are sent as prompts to the agent. Auto-compaction runs when context overflows._` });
+    await client.chat.postMessage({ channel, thread_ts: threadTs, text: lines });
     return true;
   }
 
